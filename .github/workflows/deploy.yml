@@ -1,0 +1,227 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_SUFFIX: superbox-backend
+  DEPLOY_DIR: /opt/superbox
+  WEB_ROOT: /opt/1panel/www/sites/superbox.fiacloud.top/index
+  SSH_PORT: "22"
+  PUBLIC_URL: https://superbox.fiacloud.top
+
+jobs:
+  build:
+    name: 构建镜像与前端产物
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 计算镜像地址（小写）
+        id: image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_SUFFIX }}"
+          IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
+          echo "name=$IMAGE:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "base=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送后端镜像（服务器不构建）
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          build-args: |
+            PIP_INDEX_URL=${{ vars.PIP_INDEX_URL || 'https://pypi.org/simple' }}
+          tags: |
+            ${{ steps.image.outputs.name }}
+            ${{ steps.image.outputs.base }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 生成前端生产环境变量
+        working-directory: frontend
+        run: |
+          echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || env.PUBLIC_URL }}" > .env.production
+
+      - name: 构建前端静态产物
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 3
+
+  deploy:
+    name: 发布到服务器
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: 规范化脚本换行符（避免 Windows CRLF 进入服务器）
+        run: |
+          sed -i 's/\r$//' compose.prod.yaml .env.production.example scripts/deploy-remote.sh
+
+      - name: 配置 SSH 私钥
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SERVER_HOST:-}" ] || [ -z "${SSH_KEY:-}" ]; then
+            echo "::error::SERVER_HOST 与 SERVER_SSH_KEY 均为必填 Secret，请检查 Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+          case "$SSH_KEY" in
+            *"PRIVATE KEY"*) ;;
+            *)
+              echo "::error::SERVER_SSH_KEY 不是有效的 OpenSSH 私钥，需包含完整的 BEGIN/END OPENSSH PRIVATE KEY 两行"
+              exit 1
+              ;;
+          esac
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          # 去掉可能存在的 Windows 换行与首尾引号，否则 ssh 会拒绝该密钥
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # 统一连接参数：免交互、首次自动记录主机指纹（避免 ssh 因无法确认主机而失败）
+          {
+            echo "Host *"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  StrictHostKeyChecking accept-new"
+            echo "  BatchMode yes"
+            echo "  ServerAliveInterval 30"
+            echo "  ServerAliveCountMax 3"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+          if ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
+            echo "私钥格式校验通过"
+          else
+            echo "::error::私钥无法解析，请确认粘贴内容完整、未加密（无 passphrase）、且为 openssh 或 rsa 格式"
+            exit 1
+          fi
+
+          if ! ssh-keyscan -p "${{ env.SSH_PORT }}" -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+            echo "::warning::ssh-keyscan 未能获取主机指纹，改用 accept-new 策略；若下一步仍失败，请检查 ${{ env.SSH_PORT }} 端口是否对 GitHub Runner 开放"
+          fi
+          ssh-keygen -l -f ~/.ssh/known_hosts >/dev/null 2>&1 || true
+
+      - name: 准备服务器目录
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${{ env.SSH_PORT }}" "$SERVER_USER@$SERVER_HOST" \
+            "sudo mkdir -p '${{ env.DEPLOY_DIR }}' '${{ env.WEB_ROOT }}' && \
+             sudo chown -R \$USER '${{ env.DEPLOY_DIR }}' '${{ env.WEB_ROOT }}' && \
+             sudo chmod -R a+rX '${{ env.WEB_ROOT }}'"
+
+      - name: 预检 .env（缺失或字段不全则提前失败）
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          cat > preflight.sh <<'PREFLIGHT'
+          set -euo pipefail
+          env_file="$1"
+          value_of() {
+            sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$env_file" | tail -n 1 | sed -e "s/^\"//" -e "s/\"$//" -e "s/^'//" -e "s/'$//" -e "s/[[:space:]]*$//"
+          }
+          if [ ! -f "$env_file" ]; then
+            echo "::error::$env_file 不存在，请先在服务器创建生产配置（可参考 .env.example）"
+            exit 1
+          fi
+          missing=""
+          for key in SUPERBOX_IMAGE; do
+            if [ -z "$(value_of "$key")" ]; then missing="$missing $key"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::$env_file 缺少必需配置:$missing"
+            exit 1
+          fi
+          image="$(value_of SUPERBOX_IMAGE)"
+          case "$image" in
+            *[A-Z]*) echo "::error::SUPERBOX_IMAGE($image) 含大写字母，GHCR 要求全小写"; exit 1 ;;
+          esac
+          case "$image" in
+            ${{ env.REGISTRY }}/*) ;;
+            *) echo "::error::SUPERBOX_IMAGE($image) 必须指向 ${{ env.REGISTRY }} 仓库"; exit 1 ;;
+          esac
+          echo "预检通过：SUPERBOX_IMAGE=$image"
+          PREFLIGHT
+          ssh -p "${{ env.SSH_PORT }}" "$SERVER_USER@$SERVER_HOST" \
+            "bash -s ${{ env.DEPLOY_DIR }}/.env" < preflight.sh
+
+      - name: 同步编排文件与发布脚本
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --chmod=D755,F644 \
+            compose.prod.yaml "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/compose.yaml"
+          rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --chmod=D755,F644 \
+            .env.production.example "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/.env.example"
+          rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --chmod=D755,F755 \
+            scripts/deploy-remote.sh "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/deploy-remote.sh"
+
+      - name: 发布前端静态产物
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --delete --chmod=D755,F644 \
+            frontend-dist/ "$SERVER_USER@$SERVER_HOST:${{ env.WEB_ROOT }}/"
+
+      - name: 登录 GHCR 并发布后端
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh -p "${{ env.SSH_PORT }}" "$SERVER_USER@$SERVER_HOST" \
+            "sudo docker login ${{ env.REGISTRY }} -u '${{ github.actor }}' --password-stdin && \
+             cd '${{ env.DEPLOY_DIR }}' && bash ./deploy-remote.sh"
