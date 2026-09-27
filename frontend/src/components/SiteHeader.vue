@@ -44,7 +44,7 @@ function beginReturn(event: MouseEvent) {
         <span>返回全部工具</span>
       </RouterLink>
       <RouterLink v-else to="/" class="flex items-center gap-2.5">
-        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-base font-bold text-white shadow-sm shadow-indigo-500/20">S</span>
+        <img src="/favicon.svg" alt="" width="36" height="36" class="h-9 w-9 shrink-0" />
         <span class="text-base font-bold tracking-tight text-slate-950 dark:text-white">Superbox</span>
       </RouterLink>
     </div>
