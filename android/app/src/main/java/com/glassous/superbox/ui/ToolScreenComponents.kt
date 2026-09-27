@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.glassous.superbox.data.ToolInfo
 import kotlinx.coroutines.CancellationException
@@ -91,17 +92,22 @@ fun ToolScreenFrame(
     tool: ToolInfo,
     state: OperationState,
     modifier: Modifier = Modifier,
+    topPadding: Dp = 0.dp,
     form: @Composable ColumnScope.() -> Unit,
 ) {
     // 列表可以滚到小白条之后，底部安全距离由内容内边距保证
     val bottomSafePadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + bottomSafePadding),
+        contentPadding = PaddingValues(start = 20.dp, top = 20.dp + topPadding, end = 20.dp, bottom = 20.dp + bottomSafePadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text(tool.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                tool.description,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.sharedToolText(toolDescriptionKey(tool.slug)),
+            )
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(18.dp)) {

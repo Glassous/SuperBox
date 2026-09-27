@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,12 +49,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -108,6 +111,10 @@ fun HomeScreen(
     var searchBounds by remember { mutableStateOf(Rect.Zero) }
     var searchButtonBounds by remember { mutableStateOf(Rect.Zero) }
     var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val listState = rememberLazyListState()
+    val showActionBorder by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
     val focusManager = LocalFocusManager.current
     val closeSearch: () -> Unit = {
         searchExpanded = false
@@ -142,6 +149,7 @@ fun HomeScreen(
                     searchExpanded = searchExpanded,
                     onSearchToggle = { if (searchExpanded) closeSearch() else searchExpanded = true },
                     onSearchButtonBounds = { searchButtonBounds = it },
+                    showActionBorder = showActionBorder,
                     themeMode = themeMode,
                     onThemeMode = onThemeMode,
                 )
@@ -158,12 +166,13 @@ fun HomeScreen(
                     .any { it.contains(query.trim(), ignoreCase = true) }
             }
 
-            Box(Modifier.fillMaxSize().padding(padding).clipToBounds()) {
+            Box(Modifier.fillMaxSize()) {
                 // 列表可以滚到小白条之后，底部安全距离由内容内边距保证
                 val bottomSafePadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + bottomSafePadding),
+                    state = listState,
+                    contentPadding = PaddingValues(start = 20.dp, top = 20.dp + padding.calculateTopPadding(), end = 20.dp, bottom = 20.dp + bottomSafePadding),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     when (state) {
@@ -190,15 +199,17 @@ fun HomeScreen(
                     }
                 }
                 // 悬浮搜索框：位于顶部栏下方，浮在主区域之上，不改变顶部栏与主区域的布局
-                FloatingSearchBar(
-                    expanded = searchExpanded,
-                    query = query,
-                    onQueryChange = { if (it.length <= 100) query = it },
-                    onBoundsChange = { searchBounds = it },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 20.dp, end = 20.dp, top = SearchBarTopInset),
-                )
+                Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()).clipToBounds()) {
+                    FloatingSearchBar(
+                        expanded = searchExpanded,
+                        query = query,
+                        onQueryChange = { if (it.length <= 100) query = it },
+                        onBoundsChange = { searchBounds = it },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 20.dp, end = 20.dp, top = SearchBarTopInset),
+                    )
+                }
             }
         }
     }
@@ -210,29 +221,38 @@ private fun HomeTopBar(
     searchExpanded: Boolean,
     onSearchToggle: () -> Unit,
     onSearchButtonBounds: (Rect) -> Unit,
+    showActionBorder: Boolean,
     themeMode: ThemeMode,
     onThemeMode: (ThemeMode) -> Unit,
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
-    TopAppBar(
+    FadingTopAppBar(
         title = { Text("Superbox", fontWeight = FontWeight.Bold) },
         actions = {
             // 搜索框展开时，搜索按钮换成关闭图标
-            IconButton(
-                onClick = onSearchToggle,
-                modifier = Modifier.onGloballyPositioned { onSearchButtonBounds(it.boundsInWindow()) },
-            ) {
-                Icon(
-                    painterResource(if (searchExpanded) R.drawable.ic_close else R.drawable.ic_search),
-                    contentDescription = if (searchExpanded) "关闭搜索" else "搜索",
-                    modifier = Modifier.size(24.dp),
-                )
+            CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                IconButton(
+                    onClick = onSearchToggle,
+                    modifier = Modifier
+                        .onGloballyPositioned { onSearchButtonBounds(it.boundsInWindow()) }
+                        .actionCircle(showActionBorder),
+                ) {
+                    Icon(
+                        painterResource(if (searchExpanded) R.drawable.ic_close else R.drawable.ic_search),
+                        contentDescription = if (searchExpanded) "关闭搜索" else "搜索",
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
+            Spacer(Modifier.width(8.dp))
             // 三点按钮与其呼出的卡片禁用涟漪（波浪纹）
             CompositionLocalProvider(LocalRippleConfiguration provides null) {
                 Box {
-                    IconButton(onClick = { menuExpanded = !menuExpanded }) {
+                    IconButton(
+                        onClick = { menuExpanded = !menuExpanded },
+                        modifier = Modifier.actionCircle(showActionBorder),
+                    ) {
                         Icon(
                             painterResource(R.drawable.ic_more_vert),
                             contentDescription = "更多选项",
@@ -252,9 +272,20 @@ private fun HomeTopBar(
                 }
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
 }
+
+@Composable
+private fun Modifier.actionCircle(showBorder: Boolean): Modifier =
+    this
+        .size(48.dp)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.background)
+        .border(
+            width = 1.dp,
+            color = if (showBorder) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent,
+            shape = CircleShape,
+        )
 
 /**
  * 三点按钮呼出的卡片：沿用页面卡片的圆角与配色，右上角与三点按钮重合。
@@ -440,43 +471,67 @@ private fun Modifier.spreadFromTopEnd(fraction: Float): Modifier = drawWithConte
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToolCard(card: CatalogTool, onClick: () -> Unit) {
     val enabled = card.availability == ToolAvailability.AVAILABLE
-    Card(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            disabledContainerColor = MaterialTheme.colorScheme.surface,
-            disabledContentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ToolMark(card.info.slug)
-                Text(card.info.category, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+        Card(
+            onClick = onClick,
+            enabled = enabled,
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .sharedToolContainer(card.info.slug),
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ToolMark(
+                        card.info.slug,
+                        modifier = Modifier.sharedToolMark(card.info.slug),
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            card.info.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.sharedToolText(toolTitleKey(card.info.slug)),
+                        )
+                        Text(card.info.category, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                Text(
+                    card.info.description,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.sharedToolText(toolDescriptionKey(card.info.slug)),
+                )
+                val status = when (card.availability) {
+                    ToolAvailability.AVAILABLE -> null
+                    ToolAvailability.SERVER_DISABLED -> "云端暂未提供，当前不可使用"
+                    ToolAvailability.UPDATE_REQUIRED -> "请更新应用后使用此功能"
+                }
+                status?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
-            Text(card.info.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(card.info.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            val status = when (card.availability) {
-                ToolAvailability.AVAILABLE -> "打开工具 →"
-                ToolAvailability.SERVER_DISABLED -> "云端暂未提供，当前不可使用"
-                ToolAvailability.UPDATE_REQUIRED -> "请更新应用后使用此功能"
-            }
-            Text(
-                status,
-                color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }
 
 @Composable
-private fun ToolMark(slug: String) {
+private fun ToolMark(slug: String, modifier: Modifier = Modifier) {
     val dark = MaterialTheme.colorScheme.background == SuperboxColors.darkBackground
     val (mark, tint, lightBackground) = when (slug) {
         "json" -> Triple("{ }", Color(0xFF4F46E5), Color(0xFFE0E7FF))
@@ -489,6 +544,7 @@ private fun ToolMark(slug: String) {
     Surface(
         color = if (dark) tint.copy(alpha = 0.16f) else lightBackground,
         shape = RoundedCornerShape(16.dp),
+        modifier = modifier,
     ) {
         Text(
             mark,

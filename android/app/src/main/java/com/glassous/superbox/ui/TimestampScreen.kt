@@ -4,28 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.glassous.superbox.R
 import com.glassous.superbox.data.ApiClient
 import com.glassous.superbox.data.ToolInfo
 
@@ -41,24 +30,9 @@ fun TimestampScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
     Scaffold(
         // 内容延伸到系统栏之后（小白条沉浸），底部安全距离由内容自己保证
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopAppBar(
-                title = { Text(tool.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = "返回",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { ToolTopBar(tool.name, tool.slug, onBack) },
     ) { padding ->
-        ToolScreenFrame(tool, operation, Modifier.padding(padding)) {
+        ToolScreenFrame(tool, operation, topPadding = padding.calculateTopPadding()) {
             Text("转换方向")
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 ModeChip("时间戳 → 日期", mode == "to-datetime") {

@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,17 +27,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,11 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.glassous.superbox.R
 import com.glassous.superbox.data.ApiClient
 import com.glassous.superbox.data.ExifCatalogTag
 import com.glassous.superbox.data.ExifInspection
@@ -180,28 +175,13 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
     Scaffold(
         // 内容延伸到系统栏之后（小白条沉浸），底部安全距离由内容自己保证
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopAppBar(
-                title = { Text(tool.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = "返回",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
+        topBar = { ToolTopBar(tool.name, tool.slug, onBack) },
     ) { padding ->
         // 列表可以滚到小白条之后，底部安全距离由内容内边距保证
         val bottomSafePadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + bottomSafePadding),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, top = 20.dp + padding.calculateTopPadding(), end = 20.dp, bottom = 20.dp + bottomSafePadding),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
@@ -292,11 +272,13 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(tag.key, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold,
                                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), modifier = Modifier.weight(1f))
-                                if (tag.writable) TextButton(onClick = {
-                                    if (original.none { it.key == tag.key }) drafts = drafts - tag.key
-                                    else deleted = if (tag.key in deleted) deleted - tag.key else deleted + tag.key
-                                    message = null
-                                }) { Text(if (tag.key in deleted) "撤销删除" else "删除") }
+                                if (tag.writable) CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                    TextButton(onClick = {
+                                        if (original.none { it.key == tag.key }) drafts = drafts - tag.key
+                                        else deleted = if (tag.key in deleted) deleted - tag.key else deleted + tag.key
+                                        message = null
+                                    }) { Text(if (tag.key in deleted) "撤销删除" else "删除") }
+                                }
                                 else Text("只读", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (!tag.writable) {
@@ -329,8 +311,10 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                             if (searching) Text("正在搜索…")
                             catalog.filter { candidate -> candidate.writable && original.none { it.key == candidate.key } && candidate.key !in drafts }
                                 .take(30).forEach { candidate ->
-                                    TextButton(onClick = { drafts = drafts + (candidate.key to ""); filter = ""; message = null }) {
-                                        Text("＋ ${candidate.key}", modifier = Modifier.fillMaxWidth())
+                                    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                        TextButton(onClick = { drafts = drafts + (candidate.key to ""); filter = ""; message = null }) {
+                                            Text("＋ ${candidate.key}", modifier = Modifier.fillMaxWidth())
+                                        }
                                     }
                                 }
                             if (!searching && tagQuery.isNotBlank() && catalog.none { it.writable && original.none { tag -> tag.key == it.key } && it.key !in drafts }) {
