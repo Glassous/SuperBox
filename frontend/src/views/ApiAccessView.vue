@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import ExpandableApiCard from '../components/ExpandableApiCard.vue'
+import SiteHeader from '../components/SiteHeader.vue'
 import { apiBaseUrl } from '../api/client'
 import { apiDocs } from '../data/apiDocs'
 
@@ -12,15 +13,7 @@ const activeSlug = ref<string | null>(null)
   <div class="min-h-screen">
     <!-- The teleport target stays under the theme root, outside the inert page. -->
     <div ref="overlayHost" />
-    <header :inert="Boolean(activeSlug)" class="border-b border-slate-200/80 bg-white/85 dark:border-white/10 dark:bg-[#111629]/85">
-      <div class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-5 sm:px-9">
-        <div class="flex items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-base font-bold text-white">S</div>
-          <div class="flex items-center gap-2.5"><span class="text-base font-bold tracking-tight text-slate-950 dark:text-white">Superbox</span><span class="h-4 w-px bg-slate-200 dark:bg-white/15"></span><span class="text-sm font-semibold text-slate-500 dark:text-slate-400">开发者接口</span></div>
-        </div>
-        <div class="flex items-center gap-3"><span class="hidden rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 font-mono text-xs font-semibold text-indigo-600 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300 sm:inline">v1</span><a href="/" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-300 sm:text-sm">打开工具箱 ↗</a></div>
-      </div>
-    </header>
+    <SiteHeader :inert="Boolean(activeSlug)" />
 
     <main :inert="Boolean(activeSlug)" class="mx-auto w-full max-w-7xl px-5 pb-18 pt-10 sm:px-9 sm:pt-14">
       <div class="flex flex-col justify-between gap-6 border-b border-slate-200 pb-9 dark:border-white/10 sm:flex-row sm:items-end">
