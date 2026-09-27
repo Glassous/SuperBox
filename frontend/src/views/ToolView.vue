@@ -11,6 +11,7 @@ const forms = {
   base64: defineAsyncComponent(() => import('../tools/Base64Tool.vue')),
   url: defineAsyncComponent(() => import('../tools/UrlTool.vue')),
   timestamp: defineAsyncComponent(() => import('../tools/TimestampTool.vue')),
+  exif: defineAsyncComponent(() => import('../tools/ExifTool.vue')),
 }
 
 const route = useRoute()

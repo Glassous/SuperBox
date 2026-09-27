@@ -24,3 +24,31 @@ export interface UnixTimestampResult {
   seconds: string
   milliseconds: string
 }
+
+export interface ExifTag {
+  key: string
+  group: string
+  name: string
+  value: string
+  writable: boolean
+  reason: string
+}
+
+export interface ExifCatalogTag {
+  key: string
+  group: string
+  name: string
+  type: string
+  writable: boolean
+}
+
+export interface ExifInspectResult {
+  format: 'JPEG' | 'PNG' | 'WEBP'
+  tags: ExifTag[]
+}
+
+export interface ExifChange {
+  key: string
+  action: 'set' | 'delete'
+  value?: string
+}

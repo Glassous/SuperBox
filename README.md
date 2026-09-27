@@ -1,10 +1,12 @@
 # Superbox
 
-一个由 FastAPI 提供工具能力、Vue 负责展示的开发工具箱。首批提供 JSON、Base64、URL 参数值和时间戳工具。所有搜索、校验与转换均通过后端 API 完成。
+一个由 FastAPI 提供工具能力、Vue 负责展示的开发工具箱。提供 JSON、Base64、URL 参数值、时间戳和图片 EXIF 编辑工具。所有搜索、校验与转换均通过后端 API 完成。
 
 ## 本地开发
 
 后端（Python 3.12+）：
+
+EXIF 工具还需要 [ExifTool](https://exiftool.org/install.html)。将 `exiftool` 放入 PATH，或设置 `EXIFTOOL_PATH` 为可执行文件路径；容器构建会自动安装。
 
 ```powershell
 cd backend

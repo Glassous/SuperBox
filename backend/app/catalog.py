@@ -38,4 +38,11 @@ TOOLS: list[ToolInfo] = [
         "description": "在 Unix 时间戳与带时区的日期时间之间转换。",
         "keywords": ["timestamp", "unix", "秒", "毫秒", "日期"],
     },
+    {
+        "slug": "exif",
+        "name": "EXIF 编辑",
+        "category": "图片处理",
+        "description": "查看、编辑图片 EXIF 标签并下载原格式图片。",
+        "keywords": ["exif", "图片", "元数据", "照片", "gps"],
+    },
 ]

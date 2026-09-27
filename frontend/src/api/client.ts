@@ -1,4 +1,4 @@
-import type { ToolInfo } from '../types'
+import type { ExifCatalogTag, ExifChange, ExifInspectResult, ToolInfo } from '../types'
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087').replace(/\/$/, '')
 
@@ -57,4 +57,39 @@ export function getTool(slug: string, signal?: AbortSignal): Promise<ToolInfo> {
 
 export function postTool<T>(path: string, body: object): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+}
+
+async function multipartRequest(path: string, form: FormData, signal?: AbortSignal): Promise<Response> {
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
+      method: 'POST', body: form, credentials: 'omit', signal,
+    })
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+    throw new ApiError('无法连接后端服务，请确认 API 已启动。')
+  }
+  if (!response.ok) {
+    let body: ApiErrorBody = {}
+    try { body = await response.json() as ApiErrorBody } catch { /* Keep the HTTP status. */ }
+    throw new ApiError(body.message || '图片处理失败。', response.status, body.code)
+  }
+  return response
+}
+
+export async function inspectExif(file: File, signal?: AbortSignal): Promise<ExifInspectResult> {
+  const form = new FormData()
+  form.append('image', file)
+  return (await multipartRequest('/exif/inspect', form, signal)).json() as Promise<ExifInspectResult>
+}
+
+export function searchExifTags(q = '', signal?: AbortSignal): Promise<{ tags: ExifCatalogTag[] }> {
+  return request(`/exif/tags?q=${encodeURIComponent(q)}`, { signal })
+}
+
+export async function editExif(file: File, changes: ExifChange[]): Promise<Blob> {
+  const form = new FormData()
+  form.append('image', file)
+  form.append('changes', JSON.stringify(changes))
+  return (await multipartRequest('/exif/edit', form)).blob()
 }

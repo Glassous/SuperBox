@@ -13,7 +13,7 @@ def test_catalog_search_and_detail():
     catalog = client.get(f"{API}/tools")
     assert catalog.status_code == 200
     assert {tool["slug"] for tool in catalog.json()["tools"]} == {
-        "json", "base64", "url", "timestamp"
+        "json", "base64", "url", "timestamp", "exif"
     }
     assert [tool["slug"] for tool in client.get(f"{API}/tools?q=编码").json()["tools"]] == [
         "base64", "url"
@@ -137,5 +137,5 @@ def test_wildcard_cors_and_openapi():
 
 def test_every_tool_has_an_interface_document():
     docs = Path(__file__).resolve().parents[2] / "docs"
-    for slug in ["json", "base64", "url", "timestamp"]:
+    for slug in ["json", "base64", "url", "timestamp", "exif"]:
         assert (docs / f"{slug}.md").is_file()

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import router
+from app.exif import ExifUnavailableError
 from app.services import ToolInputError
 
 
@@ -22,6 +23,11 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+
+
+@app.exception_handler(ExifUnavailableError)
+async def exif_unavailable(_request: Request, exc: ExifUnavailableError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"code": "EXIF_UNAVAILABLE", "message": str(exc)})
 
 
 @app.exception_handler(ToolInputError)
@@ -55,7 +61,7 @@ async def http_error(_request: Request, exc: StarletteHTTPException) -> JSONResp
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "code": "NOT_FOUND" if exc.status_code == 404 else "HTTP_ERROR",
+            "code": "NOT_FOUND" if exc.status_code == 404 else "FILE_TOO_LARGE" if exc.status_code == 413 else "VALIDATION_ERROR" if exc.status_code == 422 else "HTTP_ERROR",
             "message": str(exc.detail),
         },
     )

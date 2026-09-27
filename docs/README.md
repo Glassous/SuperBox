@@ -1,6 +1,6 @@
 # Superbox API 文档
 
-基础地址：`http://localhost:8087/api/v1`。所有工具操作使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。时间戳与日期字段有各自的更短限制。所有工具运算和搜索均由后端执行。
+基础地址：`http://localhost:8087/api/v1`。文本工具使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。图片 EXIF 工具使用 multipart 上传，编辑结果为二进制图片。所有工具运算和搜索均由后端执行。
 
 面向接入方的页面位于前端路由 `/api-access`，提供分工具说明、在线测试与 AI 接入提示词。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
 
@@ -10,6 +10,7 @@
 | Base64 编解码 | [base64.md](base64.md) |
 | URL 参数值编解码 | [url.md](url.md) |
 | 时间戳转换 | [timestamp.md](timestamp.md) |
+| 图片 EXIF 编辑与下载 | [exif.md](exif.md) |
 
 ## 公共接口
 

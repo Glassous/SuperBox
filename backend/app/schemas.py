@@ -63,3 +63,35 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
     details: list[ErrorDetail] | None = None
+
+
+class ExifTag(BaseModel):
+    key: str
+    group: str
+    name: str
+    value: str
+    writable: bool
+    reason: str
+
+
+class ExifInspectResult(BaseModel):
+    format: Literal["JPEG", "PNG", "WEBP"]
+    tags: list[ExifTag]
+
+
+class ExifCatalogTag(BaseModel):
+    key: str
+    group: str
+    name: str
+    type: str
+    writable: bool
+
+
+class ExifCatalogResult(BaseModel):
+    tags: list[ExifCatalogTag]
+
+
+class ExifChange(BaseModel):
+    key: str = Field(min_length=1, max_length=100)
+    action: Literal["set", "delete"]
+    value: str = Field(default="", max_length=4096)

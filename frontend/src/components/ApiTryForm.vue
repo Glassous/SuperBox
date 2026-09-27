@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { ApiError, postTool } from '../api/client'
+import { ApiError, editExif, inspectExif, postTool, searchExifTags } from '../api/client'
 import type { ApiOperation } from '../data/apiDocs'
 
 const props = defineProps<{ operation: ApiOperation }>()
@@ -9,6 +9,7 @@ const responseText = ref('')
 const status = ref<number | null>(null)
 const error = ref('')
 const loading = ref(false)
+const selectedFile = ref<File | null>(null)
 let requestId = 0
 
 watch(() => props.operation, operation => {
@@ -18,6 +19,7 @@ watch(() => props.operation, operation => {
   status.value = null
   error.value = ''
   loading.value = false
+  selectedFile.value = null
 }, { immediate: true })
 
 async function sendRequest() {
@@ -27,7 +29,25 @@ async function sendRequest() {
   error.value = ''
   status.value = null
   try {
-    const response = await postTool<Record<string, unknown>>(props.operation.path, values.value)
+    if (props.operation.multipart && !selectedFile.value) throw new Error('请先选择图片。')
+    if (props.operation.binaryResponse) {
+      const blob = await editExif(selectedFile.value!, JSON.parse(values.value.changes || '[]') as { key: string; action: 'set' | 'delete'; value?: string }[])
+      if (current !== requestId) return
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `edited-exif.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`
+      anchor.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      responseText.value = `图片已下载（${blob.size} 字节，${blob.type}）`
+      status.value = 200
+      return
+    }
+    const response = props.operation.path === '/exif/inspect'
+      ? await inspectExif(selectedFile.value!)
+      : props.operation.path === '/exif/tags'
+        ? await searchExifTags(values.value.q)
+        : await postTool<Record<string, unknown>>(props.operation.path, values.value)
     if (current !== requestId) return
     responseText.value = JSON.stringify(response, null, 2)
     status.value = 200
@@ -60,6 +80,7 @@ async function sendRequest() {
         <select v-if="field.options" v-model="values[field.name]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white">
           <option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
+        <input v-else-if="field.type === 'file'" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="mt-2 block w-full text-sm" @change="selectedFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
         <textarea v-else-if="field.multiline" v-model="values[field.name]" spellcheck="false" rows="3" class="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white"></textarea>
         <input v-else v-model="values[field.name]" type="text" spellcheck="false" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white" />
       </label>
