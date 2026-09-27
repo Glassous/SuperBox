@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.SuperBox" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/superbox_dark_background</item>
+        <item name="android:navigationBarColor">@color/superbox_dark_background</item>
+    </style>
+</resources>
