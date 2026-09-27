@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { beginToolTransition, cancelToolTransition, finishToolTransition, getReturningSlug, isPlainNavigation } from '../animations/toolOpenTransition'
 import { getTools } from '../api/client'
 import ToolMark from '../components/ToolMark.vue'
 import type { ToolInfo } from '../types'
@@ -11,6 +12,26 @@ const loading = ref(true)
 const error = ref('')
 let timer: ReturnType<typeof setTimeout> | undefined
 let activeController: AbortController | undefined
+
+function beginOpen(event: MouseEvent, tool: ToolInfo) {
+  if (!isPlainNavigation(event) || !(event.currentTarget instanceof HTMLElement)) return
+  beginToolTransition('open', tool.slug, event.currentTarget, tool)
+}
+
+async function finishReturn() {
+  const slug = getReturningSlug()
+  if (!slug || loading.value) return
+  if (error.value) {
+    cancelToolTransition()
+    return
+  }
+  await nextTick()
+  if (getReturningSlug() !== slug) return
+  const cards = document.querySelectorAll<HTMLElement>('[data-tool-slug]')
+  const card = Array.from(cards).find(element => element.dataset.toolSlug === slug)
+  if (card) finishToolTransition('return', slug, card)
+  else cancelToolTransition()
+}
 
 async function loadTools() {
   activeController?.abort()
@@ -34,6 +55,7 @@ watch(query, () => {
   if (timer) clearTimeout(timer)
   timer = setTimeout(loadTools, 250)
 })
+watch(loading, () => { void finishReturn() }, { flush: 'post' })
 onMounted(loadTools)
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer)
@@ -67,13 +89,13 @@ onBeforeUnmount(() => {
         <p class="mt-1 text-sm text-slate-500">试试其他关键词。</p>
       </div>
       <div v-else class="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <RouterLink v-for="tool in tools" :key="tool.slug" :to="`/tools/${tool.slug}`" class="group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-900/5 dark:border-white/10 dark:bg-[#141a2c] dark:hover:border-indigo-400/30">
+        <RouterLink v-for="tool in tools" :key="tool.slug" :to="`/tools/${tool.slug}`" :data-tool-slug="tool.slug" class="group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-900/5 dark:border-white/10 dark:bg-[#141a2c] dark:hover:border-indigo-400/30" @click.capture="beginOpen($event, tool)">
           <div class="flex items-start justify-between">
-            <ToolMark :slug="tool.slug" size="lg" />
-            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500 dark:bg-white/5 dark:text-slate-400">{{ tool.category }}</span>
+            <div data-tool-transition="icon"><ToolMark :slug="tool.slug" size="lg" /></div>
+            <span data-tool-transition="category" class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500 dark:bg-white/5 dark:text-slate-400">{{ tool.category }}</span>
           </div>
-          <h3 class="mt-6 text-lg font-bold text-slate-950 dark:text-white">{{ tool.name }}</h3>
-          <p class="mt-2 min-h-10 text-sm leading-5 text-slate-500 dark:text-slate-400">{{ tool.description }}</p>
+          <h3 data-tool-transition="title" class="mt-6 text-lg font-bold text-slate-950 dark:text-white">{{ tool.name }}</h3>
+          <p data-tool-transition="description" class="mt-2 min-h-10 text-sm leading-5 text-slate-500 dark:text-slate-400">{{ tool.description }}</p>
           <div class="mt-5 flex items-center gap-2 text-sm font-semibold text-indigo-600 transition group-hover:gap-3 dark:text-indigo-400">打开工具 <span>→</span></div>
         </RouterLink>
       </div>
