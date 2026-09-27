@@ -25,6 +25,8 @@ jobs:
   build:
     name: 构建镜像与前端产物
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -160,41 +162,19 @@ jobs:
              sudo chown -R \$USER '${{ env.DEPLOY_DIR }}' '${{ env.WEB_ROOT }}' && \
              sudo chmod -R a+rX '${{ env.WEB_ROOT }}'"
 
-      - name: 预检 .env（缺失或字段不全则提前失败）
+      - name: 写入服务器 .env（自动创建或更新镜像地址）
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          cat > preflight.sh <<'PREFLIGHT'
           set -euo pipefail
-          env_file="$1"
-          value_of() {
-            sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$env_file" | tail -n 1 | sed -e "s/^\"//" -e "s/\"$//" -e "s/^'//" -e "s/'$//" -e "s/[[:space:]]*$//"
-          }
-          if [ ! -f "$env_file" ]; then
-            echo "::error::$env_file 不存在，请先在服务器创建生产配置（可参考 .env.example）"
-            exit 1
-          fi
-          missing=""
-          for key in SUPERBOX_IMAGE; do
-            if [ -z "$(value_of "$key")" ]; then missing="$missing $key"; fi
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::$env_file 缺少必需配置:$missing"
-            exit 1
-          fi
-          image="$(value_of SUPERBOX_IMAGE)"
-          case "$image" in
-            *[A-Z]*) echo "::error::SUPERBOX_IMAGE($image) 含大写字母，GHCR 要求全小写"; exit 1 ;;
-          esac
-          case "$image" in
-            ${{ env.REGISTRY }}/*) ;;
-            *) echo "::error::SUPERBOX_IMAGE($image) 必须指向 ${{ env.REGISTRY }} 仓库"; exit 1 ;;
-          esac
-          echo "预检通过：SUPERBOX_IMAGE=$image"
-          PREFLIGHT
           ssh -p "${{ env.SSH_PORT }}" "$SERVER_USER@$SERVER_HOST" \
-            "bash -s ${{ env.DEPLOY_DIR }}/.env" < preflight.sh
+            "cd '${{ env.DEPLOY_DIR }}' && \
+             touch .env && \
+             sed -i -E '/^[[:space:]]*SUPERBOX_IMAGE[[:space:]]*=/d' .env && \
+             printf 'SUPERBOX_IMAGE=%s\n' '${{ needs.build.outputs.image }}' >> .env && \
+             chmod 600 .env && \
+             grep '^SUPERBOX_IMAGE=' .env"
 
       - name: 同步编排文件与发布脚本
         env:
