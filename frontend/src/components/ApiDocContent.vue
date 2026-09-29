@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import ApiTryForm from './ApiTryForm.vue'
 import { apiBaseUrl } from '../api/client'
 import { makeAiPrompt, type ApiToolDoc } from '../data/apiDocs'
 
-const props = defineProps<{ doc: ApiToolDoc; initialOperationId?: string }>()
-const selectedOperationId = ref(
-  props.doc.operations.find(operation => operation.id === props.initialOperationId)?.id
-  ?? props.doc.operations[0]?.id
-  ?? '',
-)
+const props = defineProps<{ doc: ApiToolDoc }>()
+const selectedOperationId = ref(props.doc.operations[0]?.id ?? '')
 const operationContent = ref<HTMLElement | null>(null)
 const copied = ref<'endpoint' | 'example' | 'prompt' | null>(null)
 const currentOperation = computed(() => props.doc.operations.find(operation => operation.id === selectedOperationId.value) ?? props.doc.operations[0])
@@ -30,15 +26,6 @@ function selectOperation(id: string) {
   selectedOperationId.value = id
   operationContent.value?.scrollTo({ top: 0 })
 }
-// The overview can hand over a new operation while the card is already open.
-watch(
-  () => props.initialOperationId,
-  operationId => {
-    if (operationId && props.doc.operations.some(operation => operation.id === operationId)) {
-      selectOperation(operationId)
-    }
-  },
-)
 async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
   try {
     await navigator.clipboard.writeText(value)
