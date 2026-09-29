@@ -2,7 +2,7 @@
 
 基础地址：`http://localhost:8087/api/v1`。文本工具使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。图片 EXIF 工具使用 multipart 上传，编辑结果为二进制图片。所有工具运算和搜索均由后端执行。
 
-面向接入方的页面位于前端路由 `/api-access`，提供分工具说明、在线测试与 AI 接入提示词。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
+面向接入方的页面位于前端路由 `/api-access`，顶部提供全部功能总览（可复制地址、直达在线测试），并按工具提供接口说明、在线测试与 AI 接入提示词。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
 
 | 功能 | 文档 |
 | --- | --- |
@@ -18,6 +18,8 @@
 - `GET /api/v1/tools`：返回 `{"tools":[{"slug","name","category","description","keywords"}, ...]}`；可选 `q` 参数在名称、分类、描述和关键词中搜索，最多 100 字符。
 - `GET /api/v1/tools/{slug}`：返回单个工具的元数据；未知 slug 返回 404。
 - `GET /api/v1/openapi.json`：可供客户端生成器读取的 OpenAPI 定义。
+- `GET /api/v1/skill`：返回覆盖全部工具与公共接口的官方 Skill（纯 Markdown，`text/markdown; charset=utf-8`），其他 AI 平台可按 URL 拉取后直接接入；文档中的示例地址按请求的 Base URL 生成。
+- `GET /api/v1/skill.json`：与 `/skill` 同源的 JSON 清单，包含工具列表与每个端点的功能介绍、请求格式（`json`／`multipart`／`query`／`path`／`none`）、请求与响应示例及统一错误契约，便于程序化解析；`url` 字段与示例地址同样按请求的 Base URL 生成。
 - `GET /docs`：交互式接口文档。
 
 ## 统一错误格式

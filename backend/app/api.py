@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import TypeAdapter, ValidationError
 
 from app.catalog import TOOLS
+from app.skill import build_skill_manifest, build_skill_markdown
 from app.schemas import (
     DateTimeResult,
     ErrorResponse,
@@ -38,6 +39,23 @@ router = APIRouter(
 @router.get("/health", response_model=HealthResult, tags=["System"])
 def health() -> HealthResult:
     return HealthResult(status="ok")
+
+
+@router.get("/skill", responses={200: {"content": {"text/markdown": {}}}}, tags=["System"])
+def get_skill(request: Request) -> Response:
+    return Response(
+        content=build_skill_markdown(str(request.base_url)),
+        media_type="text/markdown; charset=utf-8",
+    )
+
+
+@router.get(
+    "/skill.json",
+    responses={200: {"content": {"application/json": {}}}},
+    tags=["System"],
+)
+def get_skill_manifest(request: Request) -> dict:
+    return build_skill_manifest(str(request.base_url))
 
 
 @router.get("/tools", response_model=ToolCatalogResult, tags=["Catalog"])

@@ -139,3 +139,66 @@ def test_every_tool_has_an_interface_document():
     docs = Path(__file__).resolve().parents[2] / "docs"
     for slug in ["json", "base64", "url", "timestamp", "exif"]:
         assert (docs / f"{slug}.md").is_file()
+
+
+def test_skill_markdown_document():
+    response = client.get(f"{API}/skill")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/markdown")
+    body = response.text
+    assert body.startswith("# Superbox API 官方 Skill")
+    assert "http://testserver/api/v1" in body
+    for path in [
+        "/health", "/tools", "/tools/{slug}", "/openapi.json",
+        "/json/format", "/json/minify", "/json/validate",
+        "/base64/encode", "/base64/decode",
+        "/url/encode", "/url/decode",
+        "/timestamp/to-datetime", "/timestamp/to-unix",
+        "/exif/inspect", "/exif/tags", "/exif/edit",
+    ]:
+        assert f"/api/v1{path}" in body
+    for code in [
+        "INVALID_INPUT", "NOT_FOUND", "FILE_TOO_LARGE",
+        "VALIDATION_ERROR", "EXIF_UNAVAILABLE",
+    ]:
+        assert code in body
+    assert f"{API}/skill" in client.get(f"{API}/openapi.json").json()["paths"]
+
+
+def test_skill_json_manifest():
+    response = client.get(f"{API}/skill.json")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    manifest = response.json()
+    assert manifest["base_url"] == "http://testserver/api/v1"
+    assert manifest["auth"] == "none"
+    assert manifest["version"] == client.get(f"{API}/openapi.json").json()["info"]["version"]
+    assert [tool["slug"] for tool in manifest["tools"]] == [
+        "json", "base64", "url", "timestamp", "exif"
+    ]
+    endpoints = manifest["endpoints"]
+    assert manifest["endpoints_total"] == len(endpoints) == 16
+    by_path = {endpoint["path"]: endpoint for endpoint in endpoints}
+    for endpoint in endpoints:
+        assert endpoint["url"] == f"http://testserver/api/v1{endpoint['path']}"
+        assert endpoint["name"] and endpoint["summary"] and endpoint["request"]
+        assert endpoint["request_format"] in {"json", "multipart", "query", "path", "none"}
+    assert by_path["/exif/edit"]["request_format"] == "multipart"
+    assert by_path["/exif/edit"]["tool"] == "exif"
+    assert by_path["/health"]["request_format"] == "none"
+    assert by_path["/health"]["tool"] is None
+    assert (
+        by_path["/json/format"]["request_example"]
+        == r'{"text":"{\"name\":\"中文\"}"}'
+    )
+    assert {error["code"] for error in manifest["errors"]} == {
+        "INVALID_INPUT", "NOT_FOUND", "FILE_TOO_LARGE", "VALIDATION_ERROR", "EXIF_UNAVAILABLE"
+    }
+    assert f"{API}/skill.json" in client.get(f"{API}/openapi.json").json()["paths"]
+
+
+def test_skill_markdown_and_manifest_share_the_same_endpoints():
+    manifest = client.get(f"{API}/skill.json").json()
+    markdown = client.get(f"{API}/skill").text
+    for endpoint in manifest["endpoints"]:
+        assert f"/api/v1{endpoint['path']}" in markdown

@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问 Vite 输出的前端地址。顶栏“API 接入”会在新标签页打开独立的 `/api-access` 页面，按工具提供接口示例、在线测试和可复制的 AI 接入提示词。API 位于 `http://localhost:8087`；FastAPI 自动生成的交互式文档仍可在 `http://localhost:8087/docs` 用于内部核对，OpenAPI 定义位于 `http://localhost:8087/api/v1/openapi.json`。
+浏览器访问 Vite 输出的前端地址。顶栏“API 接入”会在新标签页打开独立的 `/api-access` 页面：顶部“全部功能总览”列出全部对外端点并支持复制地址、直达在线测试，下方按工具提供接口示例、在线测试和可复制的 AI 接入提示词。API 位于 `http://localhost:8087`；`http://localhost:8087/api/v1/skill` 返回一份覆盖全部能力的官方 Skill（纯 Markdown），`http://localhost:8087/api/v1/skill.json` 提供同源的结构化 JSON 清单（功能介绍与接入方式），均可交给其他 AI 平台按 URL 拉取。FastAPI 自动生成的交互式文档仍可在 `http://localhost:8087/docs` 用于内部核对，OpenAPI 定义位于 `http://localhost:8087/api/v1/openapi.json`。
 
 ## 仅后端容器化部署
 

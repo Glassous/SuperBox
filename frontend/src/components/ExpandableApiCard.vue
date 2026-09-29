@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { gsap } from 'gsap'
 import ToolMark from './ToolMark.vue'
 import ApiDocContent from './ApiDocContent.vue'
 import type { ApiToolDoc } from '../data/apiDocs'
 
-const props = defineProps<{ doc: ApiToolDoc; overlayHost: HTMLElement | null; disabled: boolean }>()
+const props = defineProps<{ doc: ApiToolDoc; overlayHost: HTMLElement | null; disabled: boolean; initialOperationId?: string }>()
 const emit = defineEmits<{ opened: []; closed: [] }>()
 type Phase = 'collapsed' | 'opening' | 'open' | 'closing'
 const phase = ref<Phase>('collapsed')
@@ -217,6 +217,14 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+// The overview deep-links into a specific operation; open the card on request.
+watch(
+  () => props.initialOperationId,
+  operationId => {
+    if (operationId && phase.value === 'collapsed' && !props.disabled) void open()
+  },
+)
+
 // The listener is scoped by floating state; no global animation selectors.
 onMounted(() => {
   window.addEventListener('resize', onResize)
@@ -234,7 +242,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="slot" class="min-w-0" :style="slotHeight === undefined ? undefined : { height: `${slotHeight}px` }">
+  <div :id="`api-card-${doc.slug}`" ref="slot" class="min-w-0 scroll-mt-24" :style="slotHeight === undefined ? undefined : { height: `${slotHeight}px` }">
     <Teleport :to="overlayHost ?? 'body'" :disabled="!floating">
       <div v-if="floating" ref="shade" class="fixed inset-0 z-50 bg-slate-950/60 opacity-0" aria-hidden="true" @click="close" />
       <article ref="card" class="relative min-h-58 w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 text-left shadow-sm outline-none dark:border-white/10 dark:bg-[#141a2c]"
@@ -256,7 +264,7 @@ onBeforeUnmount(() => {
           <svg class="pointer-events-none block size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
         </button>
         <div v-if="floating" ref="body" class="absolute left-0 overflow-hidden border-t border-slate-100 opacity-0 dark:border-white/10" :inert="phase !== 'open'">
-          <ApiDocContent :doc="doc" />
+          <ApiDocContent :doc="doc" :initial-operation-id="initialOperationId" />
         </div>
       </article>
     </Teleport>
