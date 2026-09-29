@@ -18,6 +18,7 @@ env:
   IMAGE_SUFFIX: superbox-backend
   DEPLOY_DIR: /opt/superbox
   WEB_ROOT: /opt/1panel/www/sites/superbox.fiacloud.top/index
+  SITE_DOMAIN: superbox.fiacloud.top
   SSH_PORT: "22"
   PUBLIC_URL: https://superbox.fiacloud.top
 
@@ -101,7 +102,7 @@ jobs:
 
       - name: 规范化脚本换行符（避免 Windows CRLF 进入服务器）
         run: |
-          sed -i 's/\r$//' compose.prod.yaml .env.production.example scripts/deploy-remote.sh
+          sed -i 's/\r$//' compose.prod.yaml .env.production.example scripts/deploy-remote.sh scripts/configure-site-fallback.sh
 
       - name: 配置 SSH 私钥
         env:
@@ -187,6 +188,8 @@ jobs:
             .env.production.example "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/.env.example"
           rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --chmod=D755,F755 \
             scripts/deploy-remote.sh "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/deploy-remote.sh"
+          rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --chmod=D755,F755 \
+            scripts/configure-site-fallback.sh "$SERVER_USER@$SERVER_HOST:${{ env.DEPLOY_DIR }}/configure-site-fallback.sh"
 
       - name: 发布前端静态产物
         env:
@@ -195,6 +198,15 @@ jobs:
         run: |
           rsync -e "ssh -p ${{ env.SSH_PORT }}" -a --delete --chmod=D755,F644 \
             frontend-dist/ "$SERVER_USER@$SERVER_HOST:${{ env.WEB_ROOT }}/"
+
+      - name: 确保站点支持 History 路由直达（SPA 回退）
+        continue-on-error: true
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${{ env.SSH_PORT }}" "$SERVER_USER@$SERVER_HOST" \
+            "sudo bash '${{ env.DEPLOY_DIR }}/configure-site-fallback.sh' '${{ env.SITE_DOMAIN }}' '${{ env.WEB_ROOT }}'"
 
       - name: 登录 GHCR 并发布后端
         env:

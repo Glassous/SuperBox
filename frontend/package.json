@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && vite build && node scripts/generate-spa-fallbacks.mjs",
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview"
   },

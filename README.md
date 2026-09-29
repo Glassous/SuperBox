@@ -38,7 +38,27 @@ FastAPI 将通过 `http://localhost:8087` 提供服务，健康检查为 `/api/v
 
 前端单独部署：在 `frontend/` 中设置 `.env.production` 的 `VITE_API_BASE_URL` 为后端**浏览器可访问**的地址，然后运行 `npm ci` 和 `npm run build`，将 `dist/` 发布到静态网站。该变量在构建时写入前端文件；变更 API 地址后须重新构建。HTTPS 前端应使用 HTTPS API 地址，避免浏览器阻止混合内容。
 
-Vue Router 使用 History 模式。静态网站服务需将不存在的页面路径回退到 `index.html`，例如 Nginx 的 `try_files $uri $uri/ /index.html;`，这样 `/tools/json` 等直达链接才能正常打开。
+Vue Router 使用 History 模式。静态网站服务需将不存在的页面路径回退到 `index.html`，例如 Nginx 的 `try_files $uri $uri/ /index.html;`，这样 `/api-access`、`/tools/json` 等直达链接才能正常打开。
+
+部署到 1Panel 站点时有两种方式补齐该回退：
+
+```powershell
+# 方式一：服务器上执行（幂等，写入前备份并校验，失败自动回滚）
+# 优先写入面板「伪静态」管理的 rewrite 文件，面板重建站点配置后规则依然生效
+sudo bash scripts/configure-site-fallback.sh superbox.fiacloud.top /opt/1panel/www/sites/superbox.fiacloud.top/index
+```
+
+方式二：在 1Panel「网站 → 站点 → 伪静态」中粘贴以下内容并保存。
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+GitHub Actions 部署流程会自动执行 `scripts/configure-site-fallback.sh`（步骤“确保站点支持 History 路由直达”），域名与站点目录取自工作流中的 `SITE_DOMAIN`、`WEB_ROOT`；若该步骤报错，按上面的方式二手动处理即可。
+
+`npm run build` 还会为每个前端路由生成目录索引（`dist/api-access/index.html`、`dist/tools/<slug>/index.html`）：即使站点暂时没有回退规则，这些直达链接也能打开。工具列表变化时构建会自动补齐，无需手工维护。
 
 ## 验证
 
@@ -48,6 +68,14 @@ cd backend
 cd ..\frontend
 npm run typecheck
 npm run build
+```
+
+线上发布后可直接核对前端直达链接与接口健康状态：
+
+```powershell
+curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/api-access
+curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/tools/json
+curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/api/v1/health
 ```
 
 接口契约与扩展说明见 [docs/README.md](docs/README.md)。
