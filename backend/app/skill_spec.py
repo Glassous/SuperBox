@@ -21,7 +21,7 @@ class ErrorContractEntry(TypedDict):
     meaning: str
 
 
-SKILL_VERSION = "1.1.0"
+SKILL_VERSION = "1.2.0"
 
 SKILL_DESCRIPTION = (
     "Superbox 是由 FastAPI 提供工具能力的开发工具箱：JSON 格式化与校验、"
@@ -145,6 +145,11 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
          "request": "JSON：amount 为非负十进制字符串（最多 15 位整数、8 位小数），from_currency/to_currency 为目录中的三位代码；precision 默认 2，范围 0–8。汇率缓存 1 小时，上游失败仅允许获取时间不超过 24 小时的缓存，stale=true。同币种汇率 1，rate_date/fetched_at=null，source=identity。",
          "request_example": '{"amount":"100","from_currency":"CNY","to_currency":"USD","precision":2}',
          "response_example": '{"amount":"100","from_currency":"CNY","to_currency":"USD","precision":2,"result":"14.00","rate":"0.14","rate_date":"2026-10-02","source":"Frankfurter","fetched_at":"2026-10-02T04:00:00+00:00","cached":false,"stale":false}'},
+        {"method": "POST", "path": "/currency/convert-batch", "name": "多币种汇率转换",
+         "summary": "一次将一个金额兑换为最多 50 种自选货币，结果按请求顺序返回。",
+         "request": "JSON：amount/from_currency/precision 与单币种一致，to_currencies 是 1–50 项不重复的货币代码数组，统一大写；重复或超限返回 422，不支持的货币返回 400。结果逐项 status=success 或 error（带 code/message）；部分成功返回 200，全部不可用返回 503 EXCHANGE_RATE_UNAVAILABLE。成功项金额和汇率为字符串，保留实际日期、来源、cached/stale。缓存规则与单币种一致。",
+         "request_example": '{"amount":"100","from_currency":"CNY","to_currencies":["USD","EUR","JPY"],"precision":2}',
+         "response_example": '{"amount":"100","from_currency":"CNY","precision":2,"count":3,"results":[{"status":"success","amount":"100","from_currency":"CNY","to_currency":"USD","precision":2,"result":"14.00","rate":"0.14","rate_date":"2026-10-02","source":"Frankfurter","fetched_at":"2026-10-02T04:00:00+00:00","cached":false,"stale":false},{"status":"error","to_currency":"EUR","code":"EXCHANGE_RATE_UNAVAILABLE","message":"暂时无法获取该币种的汇率，请稍后重试"},{"status":"error","to_currency":"JPY","code":"EXCHANGE_RATE_UNAVAILABLE","message":"暂时无法获取该币种的汇率，请稍后重试"}]}'},
     ],
     "documents": [{
         "method": "POST", "path": "/documents/convert", "name": "文档转 Markdown/TXT",

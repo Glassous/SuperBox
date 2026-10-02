@@ -93,6 +93,7 @@ fun ToolScreenFrame(
     state: OperationState,
     modifier: Modifier = Modifier,
     topPadding: Dp = 0.dp,
+    resultContent: (@Composable () -> Unit)? = null,
     form: @Composable ColumnScope.() -> Unit,
 ) {
     // 列表可以滚到小白条之后，底部安全距离由内容内边距保证
@@ -114,7 +115,7 @@ fun ToolScreenFrame(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = form)
             }
         }
-        item { OperationResultCard(state) }
+        item { if (resultContent != null) resultContent() else OperationResultCard(state) }
     }
 }
 
@@ -166,7 +167,7 @@ private fun OperationResultCard(state: OperationState) {
             when {
                 state.loading -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CircularProgressIndicator(modifier = Modifier.padding(2.dp), strokeWidth = 2.dp)
-                    Text("正在由后端处理…")
+                    Text("正在处理…")
                 }
                 state.error != null -> Text(state.error.orEmpty(), color = MaterialTheme.colorScheme.error)
                 state.result.isNotEmpty() -> Text(

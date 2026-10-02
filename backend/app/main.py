@@ -14,7 +14,7 @@ from app.documents import DocumentAdmission
 app = FastAPI(
     title="Superbox API",
     description="工具箱的版本化 HTTP 接口。所有工具计算均在服务端完成。",
-    version="1.1.0",
+    version="1.2.0",
     openapi_url="/api/v1/openapi.json",
 )
 

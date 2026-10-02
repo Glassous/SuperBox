@@ -12,7 +12,7 @@
 | 时间戳转换 | [timestamp.md](timestamp.md) |
 | 图片 EXIF 编辑与下载 | [exif.md](exif.md) |
 | 东八区当前时间 | [time.md](time.md) |
-| 每日参考汇率转换 | [currency.md](currency.md) |
+| 每日参考汇率转换（单币种 / 最多 50 种目标） | [currency.md](currency.md) |
 | PDF/DOCX/XLSX 转 Markdown/TXT | [documents.md](documents.md) |
 
 ## 公共接口

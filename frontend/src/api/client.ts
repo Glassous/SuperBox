@@ -1,5 +1,6 @@
 import type { ExifCatalogTag, ExifChange, ExifInspectResult, ToolInfo } from '../types'
 import type { ApiOperation } from '../data/apiDocs'
+import { apiFieldValue } from '../data/apiDocs'
 
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087').replace(/\/$/, '')
 
@@ -29,8 +30,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         ...init?.headers,
       },
     })
-  } catch {
-    throw new ApiError('无法连接后端服务，请确认 API 已在 8087 端口启动。')
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+    throw new ApiError('连接失败，请检查网络后重试')
   }
 
   let data: unknown
@@ -74,6 +76,19 @@ export interface CurrencyResult {
   rate_date: string | null; source: string; fetched_at: string | null; cached: boolean; stale: boolean
 }
 
+export type CurrencyBatchItem = (CurrencyResult & { status: 'success' }) | {
+  status: 'error'; to_currency: string; code: string; message: string
+}
+export interface CurrencyBatchResult {
+  amount: string; from_currency: string; precision: number; count: number; results: CurrencyBatchItem[]
+}
+
+export function convertCurrencies(amount: string, from: string, targets: string[], precision: number, signal?: AbortSignal) {
+  return postTool<CurrencyBatchResult>('/currency/convert-batch', {
+    amount, from_currency: from, to_currencies: targets, precision,
+  }, signal)
+}
+
 export function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
@@ -98,14 +113,14 @@ export async function executeOperation(operation: ApiOperation, values: Record<s
     body = form
   } else {
     body = JSON.stringify(Object.fromEntries(operation.fields.map(field => [field.name,
-      field.type === 'integer' ? Number(values[field.name]) : values[field.name]])))
+      apiFieldValue(field.type, values[field.name] ?? '')])))
     headers = { 'Content-Type': 'application/json' }
   }
   let response: Response
   try { response = await fetch(`${apiBaseUrl}/api/v1${path}`, { method, body, headers, signal, credentials: 'omit', cache: 'no-store' }) }
   catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
-    throw new ApiError('无法连接后端服务，请检查网络和 API 地址。')
+    throw new ApiError('连接失败，请检查网络后重试')
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as ApiErrorBody
@@ -129,7 +144,7 @@ async function multipartRequest(path: string, form: FormData, signal?: AbortSign
     })
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
-    throw new ApiError('无法连接后端服务，请确认 API 已启动。')
+    throw new ApiError('连接失败，请检查网络后重试')
   }
   if (!response.ok) {
     let body: ApiErrorBody = {}

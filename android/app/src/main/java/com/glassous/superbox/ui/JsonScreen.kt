@@ -34,7 +34,7 @@ fun JsonScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
         ToolScreenFrame(tool, operation, topPadding = padding.calculateTopPadding()) {
             Text("输入 JSON")
             CodeInput(input, { input = it }, "JSON 内容", "例如：{\"name\":\"Superbox\",\"ready\":true}")
-            HelperText("支持标准 JSON；验证、格式化与压缩均由后端完成。")
+            HelperText("支持标准 JSON，可验证、格式化与压缩。")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     val source = input

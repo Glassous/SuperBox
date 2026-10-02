@@ -179,7 +179,7 @@ fun HomeScreen(
                         CatalogState.Loading -> item {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                                Text("正在获取工具目录…")
+                                Text("正在处理…")
                             }
                         }
                         is CatalogState.Failed -> item {

@@ -49,9 +49,9 @@ TOOLS: list[ToolInfo] = [
 
 TOOLS.extend([
     {"slug": "time", "name": "当前时间", "category": "时间日期",
-     "description": "获取服务器当前日期和时间，自动转换为东八区。", "keywords": ["当前", "时间", "日期", "东八区", "now"]},
+     "description": "获取当前日期和时间，自动转换为东八区。", "keywords": ["当前", "时间", "日期", "东八区", "now"]},
     {"slug": "currency", "name": "汇率转换", "category": "数据处理",
-     "description": "使用每日参考汇率转换货币金额，返回汇率日期和来源。", "keywords": ["汇率", "货币", "人民币", "美元", "currency"]},
+     "description": "使用每日参考汇率，将金额兑换为一种或多种货币。", "keywords": ["汇率", "货币", "人民币", "美元", "多币种", "计算器", "currency"]},
     {"slug": "documents", "name": "文件转换", "category": "文件处理",
      "description": "将 PDF、DOCX、XLSX 的文字和表格转换为 Markdown 或 TXT。", "keywords": ["pdf", "word", "docx", "excel", "xlsx", "markdown", "txt", "文件"]},
 ])

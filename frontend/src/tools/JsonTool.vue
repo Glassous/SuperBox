@@ -31,7 +31,7 @@ function clear() {
       <div class="p-6">
         <label for="json-input" class="sr-only">JSON 内容</label>
         <textarea id="json-input" v-model="text" spellcheck="false" placeholder='例如：{"name":"Superbox","ready":true}' class="min-h-72 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-4 font-mono text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 dark:border-white/10 dark:bg-[#0c1020] dark:text-slate-200 dark:focus:ring-indigo-400/10"></textarea>
-        <p class="mt-3 text-xs text-slate-400">支持标准 JSON；验证、格式化与压缩均由后端完成。</p>
+        <p class="mt-3 text-xs text-slate-400">支持标准 JSON，可验证、格式化与压缩。</p>
         <div class="mt-5 flex flex-wrap gap-2">
           <button :disabled="loading" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50" @click="execute('format')">格式化</button>
           <button :disabled="loading" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50 dark:border-white/15 dark:text-slate-200" @click="execute('minify')">压缩</button>

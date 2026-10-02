@@ -24,6 +24,7 @@ from app.schemas import (
     UnixTimestampInput,
     UnixTimestampResult,
     CurrentTimeResult, CurrencyInput, CurrencyCatalogResult, CurrencyResult, DocumentResult,
+    CurrencyBatchInput, CurrencyBatchResult,
 )
 from app import exif, image_source, services, current_time, currency, documents
 
@@ -54,6 +55,12 @@ async def supported_currencies() -> dict:
              responses={503: {"model": ErrorResponse}, 429: {"model": ErrorResponse}})
 async def convert_currency(body: CurrencyInput) -> dict:
     return await currency.service.convert(body)
+
+
+@router.post("/currency/convert-batch", response_model=CurrencyBatchResult, tags=["Currency"],
+             responses={503: {"model": ErrorResponse}, 429: {"model": ErrorResponse}})
+async def convert_currencies(body: CurrencyBatchInput) -> dict:
+    return await currency.service.convert_batch(body)
 
 
 @router.post("/documents/convert", response_model=DocumentResult, tags=["Documents"],

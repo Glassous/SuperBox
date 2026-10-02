@@ -19,7 +19,7 @@ fun TimeScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
     LaunchedEffect(api) { operation.run(scope) { api.currentTime() } }
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0), topBar = { ToolTopBar(tool.name, tool.slug, onBack) }) { padding ->
         ToolScreenFrame(tool, operation, topPadding = padding.calculateTopPadding()) {
-            HelperText("时间由服务器获取并转换为东八区。显示获取时的时间，可手动刷新。")
+            HelperText("显示东八区日期和时间，可手动刷新。")
             Button(onClick = { operation.run(scope) { api.currentTime() } }, enabled = !operation.loading) { Text("刷新时间") }
         }
     }

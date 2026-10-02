@@ -228,20 +228,20 @@ onBeforeUnmount(() => {
       <div class="p-6">
         <input ref="fileInput" class="sr-only" type="file" :disabled="saving" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" aria-label="选择图片" @change="chooseFile" />
         <button type="button" :disabled="saving" class="w-full rounded-xl border-2 border-dashed border-indigo-200 px-5 py-5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-400/30 dark:hover:bg-indigo-400/5" @click="fileInput?.click()">选择 JPEG、PNG 或 WebP 图片</button>
-        <p class="mt-2 text-xs text-slate-500">单张图片，最大 20 MB。也可使用下方图片链接，由后端下载后即时处理，不长期保存。</p>
+        <p class="mt-2 text-xs text-slate-500">单张图片，最大 20 MB。也可使用图片链接，即时处理，不长期保存。</p>
         <div class="mt-5 border-t border-slate-100 pt-5 dark:border-white/10">
           <label for="exif-image-url" class="text-xs font-semibold text-slate-600 dark:text-slate-300">或使用图片链接</label>
           <div class="mt-2 flex gap-2">
             <input id="exif-image-url" v-model="imageUrl" type="url" inputmode="url" spellcheck="false" :disabled="saving" placeholder="https://example.com/photo.jpg" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 disabled:opacity-50 dark:border-white/10 dark:bg-[#0c1020]" @keyup.enter="loadUrl" />
             <button type="button" :disabled="loading || saving" class="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/5" @click="loadUrl">读取链接</button>
           </div>
-          <p class="mt-2 text-xs text-slate-500">由服务器下载图片，仅支持 http/https 公开链接，最多 20 MB。</p>
+          <p class="mt-2 text-xs text-slate-500">支持公开图片链接，最多 20 MB。</p>
         </div>
         <div v-if="preview" class="mt-5 overflow-hidden rounded-xl bg-slate-100 dark:bg-[#0c1020]">
           <img :src="preview" :alt="`图片预览：${sourceName}`" class="max-h-72 w-full object-contain" />
         </div>
         <div v-if="sourceName" class="mt-3 break-all text-xs text-slate-500">{{ sourceName }} <span v-if="format">· {{ format }} · {{ tags.length }} 个 EXIF 标签</span></div>
-        <div v-if="loading" class="mt-4 text-sm text-slate-500" role="status">正在读取 EXIF…</div>
+        <div v-if="loading" class="mt-4 text-sm text-slate-500" role="status">正在处理…</div>
         <div v-if="error" class="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300" role="alert">{{ error }}</div>
         <div v-if="message" class="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">{{ message }}</div>
         <div class="mt-5 flex flex-wrap items-center gap-2">
@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
             <input v-model="tagSearch" type="search" aria-label="搜索可添加标签" placeholder="例如 DateTimeOriginal 或 GPS" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#0c1020]" @input="queueSearch" @focus="findTags" />
             <button type="button" class="rounded-lg border border-slate-200 px-3 text-sm font-semibold dark:border-white/10" @click="findTags">搜索</button>
           </div>
-          <div v-if="searching" class="mt-3 text-xs text-slate-500">正在搜索…</div>
+          <div v-if="searching" class="mt-3 text-xs text-slate-500">正在处理…</div>
           <div v-else-if="catalog.length" class="mt-3 max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-white/10">
             <button v-for="tag in catalog.filter(item => !tags.some(existing => existing.key === item.key) && !(item.key in drafts))" :key="tag.key" type="button" class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left hover:bg-indigo-50 last:border-b-0 dark:border-white/10 dark:hover:bg-white/5" @click="addTag(tag)"><span class="break-all font-mono text-xs">{{ tag.key }}</span><span class="shrink-0 text-xs text-indigo-600 dark:text-indigo-300">添加</span></button>
           </div>

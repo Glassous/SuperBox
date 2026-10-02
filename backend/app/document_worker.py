@@ -188,7 +188,7 @@ def convert(path, fmt, filename):
                     rows.insert(0, [get_column_letter(i + 1) for i in range(width)])
                 append(("## " if fmt == "markdown" else "") + sheet.title + "\n\n" + table(rows, fmt))
             if missing_formula:
-                warnings.append("部分公式没有缓存结果，已输出为空；服务器不执行公式")
+                warnings.append("部分公式没有已保存的计算结果，已输出为空；仅显示已保存的结果，不计算公式")
         finally:
             values.close()
             if formulas is not None:

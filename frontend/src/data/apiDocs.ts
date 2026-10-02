@@ -46,7 +46,7 @@ export const apiDocs: ApiToolDoc[] = [
       exampleResponse: { date: '2026-10-02', time: '12:00:00.000', iso_datetime: '2026-10-02T12:00:00.000+08:00', timezone: 'UTC+08:00', weekday: 5, unix_seconds: '1790913600', unix_milliseconds: '1790913600000' } }],
   },
   {
-    slug: 'currency', name: '汇率转换', category: '数据处理', description: '使用每日参考汇率兑换货币金额，并保留汇率日期和来源。',
+    slug: 'currency', name: '汇率转换', category: '数据处理', description: '使用每日参考汇率，将金额兑换为一种或最多 50 种自选货币，并保留日期和来源。',
     operations: [
       { id: 'currencies', name: '货币目录', summary: '获取支持的货币代码和名称。', path: '/currency/currencies', method: 'GET', fields: [], exampleBody: {}, exampleResponse: { currencies: [{ code: 'CNY', name: 'Chinese Renminbi Yuan' }, { code: 'USD', name: 'United States Dollar' }] } },
       { id: 'convert', name: '兑换金额', summary: '使用 Frankfurter 最新可用每日参考汇率进行兑换。', path: '/currency/convert', fields: [
@@ -57,6 +57,14 @@ export const apiDocs: ApiToolDoc[] = [
       ], exampleBody: { amount: '100', from_currency: 'CNY', to_currency: 'USD', precision: '2' },
       exampleResponse: { amount: '100', from_currency: 'CNY', to_currency: 'USD', precision: 2, result: '14.00', rate: '0.14', rate_date: '2026-10-02', source: 'Frankfurter', fetched_at: '2026-10-02T04:00:00+00:00', cached: false, stale: false },
       note: '参考汇率每日更新；必须保留汇率日期。缓存 1 小时，上游失败仅使用获取时间不超过 24 小时的缓存（stale=true）。无有效缓存返回 503 / EXCHANGE_RATE_UNAVAILABLE。同币种汇率 1，日期为 null。' },
+      { id: 'convert-batch', name: '多币种兑换', summary: '将一个金额兑换为最多 50 种自选货币，结果按目标顺序返回。', path: '/currency/convert-batch', fields: [
+        { name: 'amount', label: '金额', type: 'string', description: '非负十进制字符串，最多 15 位整数、8 位小数。' },
+        { name: 'from_currency', label: '原币种', type: 'string', description: '货币目录中的三位货币代码。' },
+        { name: 'to_currencies', label: '目标币种数组', type: 'string[]', multiline: true, description: 'JSON 字符串数组，1–50 个不重复的货币代码，例如 ["USD","EUR","JPY"]。' },
+        { name: 'precision', label: '小数位数', type: 'integer', description: '0–8，默认 2。', options: Array.from({ length: 9 }, (_, n) => ({ value: String(n), label: String(n) })) },
+      ], exampleBody: { amount: '100', from_currency: 'CNY', to_currencies: '["USD","EUR","JPY"]', precision: '2' },
+      exampleResponse: { amount: '100', from_currency: 'CNY', precision: 2, count: 3, results: [{ status: 'success', amount: '100', from_currency: 'CNY', to_currency: 'USD', precision: 2, result: '14.00', rate: '0.14', rate_date: '2026-10-02', source: 'Frankfurter', fetched_at: '2026-10-02T04:00:00+00:00', cached: false, stale: false }, { status: 'error', to_currency: 'EUR', code: 'EXCHANGE_RATE_UNAVAILABLE', message: '暂时无法获取该币种的汇率，请稍后重试' }, { status: 'error', to_currency: 'JPY', code: 'EXCHANGE_RATE_UNAVAILABLE', message: '暂时无法获取该币种的汇率，请稍后重试' }] },
+      note: '一次查询所有需要更新的目标汇率；结果按请求顺序返回。成功项 status=success；失败项 status=error，带 to_currency/code/message。部分成功返回 200，全部不可用返回 503 / EXCHANGE_RATE_UNAVAILABLE。重复或超过 50 项返回 422，不支持的货币返回 400。金额和汇率是字符串；逐项保留日期、来源及缓存标记。' },
     ],
   },
   {
@@ -232,9 +240,24 @@ export const apiDocs: ApiToolDoc[] = [
   },
 ]
 
+export function apiFieldValue(type: string, value: string): unknown {
+  if (type === 'integer') return Number(value)
+  if (type === 'string[]') {
+    let parsed: unknown
+    try { parsed = JSON.parse(value) } catch { throw new Error('目标币种请输入 JSON 数组，例如 ["USD","EUR"]') }
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 50 ||
+        parsed.some(item => typeof item !== 'string' || !/^[A-Za-z]{3}$/.test(item))) {
+      throw new Error('目标币种须为包含 1–50 个三位货币代码的 JSON 数组')
+    }
+    if (new Set(parsed.map(item => item.toUpperCase())).size !== parsed.length) throw new Error('目标币种不能重复')
+    return parsed
+  }
+  return value
+}
+
 export function apiExampleBody(operation: ApiOperation): Record<string, unknown> {
   return Object.fromEntries(Object.entries(operation.exampleBody).map(([key, value]) => [key,
-    operation.fields.find(field => field.name === key)?.type === 'integer' ? Number(value) : value]))
+    apiFieldValue(operation.fields.find(field => field.name === key)?.type ?? 'string', value)]))
 }
 
 export function makeAiPrompt(doc: ApiToolDoc, baseUrl: string): string {

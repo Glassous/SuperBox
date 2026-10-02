@@ -209,7 +209,7 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                         }
                         if (loading || saving) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             CircularProgressIndicator(modifier = Modifier.padding(2.dp), strokeWidth = 2.dp)
-                            Text(if (saving) "正在编辑或保存…" else "正在读取 EXIF…")
+                            Text("正在处理…")
                         }
                         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                         message?.let { Text(it, color = ColorSuccess) }
@@ -308,7 +308,7 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            if (searching) Text("正在搜索…")
+                            if (searching) Text("正在处理…")
                             catalog.filter { candidate -> candidate.writable && original.none { it.key == candidate.key } && candidate.key !in drafts }
                                 .take(30).forEach { candidate ->
                                     CompositionLocalProvider(LocalRippleConfiguration provides null) {

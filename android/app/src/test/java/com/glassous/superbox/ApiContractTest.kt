@@ -9,6 +9,7 @@ import com.glassous.superbox.data.ToolCatalogRepository
 import com.glassous.superbox.data.ToolInfo
 import com.glassous.superbox.data.apiPath
 import com.glassous.superbox.data.calculateExifChanges
+import com.glassous.superbox.data.localizedName
 import com.glassous.superbox.data.reconcileTools
 import com.glassous.superbox.ui.ThemeMode
 import com.glassous.superbox.ui.parseThemeMode
@@ -22,6 +23,55 @@ import org.junit.Test
 import java.net.InetSocketAddress
 
 class ApiContractTest {
+    @Test fun batchConversionPreservesArrayPrecisionAndPartialResultOrder() = runBlocking {
+        var body = ""
+        var path = ""
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            path = exchange.requestURI.path
+            body = exchange.requestBody.bufferedReader().readText()
+            val reply = """{"amount":"100.12345678","from_currency":"CNY","precision":8,"count":3,"results":[{"status":"success","amount":"100.12345678","from_currency":"CNY","to_currency":"USD","result":"14.01728395","rate":"0.14","rate_date":"2026-10-02","source":"Frankfurter","fetched_at":"2026-10-02T04:00:00Z","cached":true,"stale":true},{"status":"error","to_currency":"EUR","code":"EXCHANGE_RATE_UNAVAILABLE","message":"暂时无法获取该币种的汇率"},{"status":"success","amount":"100.12345678","from_currency":"CNY","to_currency":"CNY","result":"100.12345678","rate":"1","rate_date":null,"source":"identity","fetched_at":null,"cached":false,"stale":false}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, reply.size.toLong())
+            exchange.responseBody.use { it.write(reply) }
+        }
+        server.start()
+        try {
+            val data = ApiClient("http://127.0.0.1:${server.address.port}").convertCurrencies("100.12345678", "CNY", listOf("USD", "EUR", "CNY"), 8)
+            assertEquals("/api/v1/currency/convert-batch", path)
+            val sent = org.json.JSONObject(body)
+            assertEquals("100.12345678", sent.getString("amount")); assertEquals(8, sent.getInt("precision"))
+            assertEquals(3, sent.getJSONArray("to_currencies").length())
+            assertEquals("EUR", sent.getJSONArray("to_currencies").getString(1))
+            assertEquals(listOf("USD", "EUR", "CNY"), data.results.map { it.to })
+            assertEquals(3, data.count)
+            val success = data.results[0] as com.glassous.superbox.data.CurrencySuccess
+            assertEquals("14.01728395", success.conversion.result)
+            assertEquals(true, success.display().contains("暂用上次获取的数据"))
+            assertEquals("EXCHANGE_RATE_UNAVAILABLE", (data.results[1] as com.glassous.superbox.data.CurrencyFailure).code)
+            assertEquals(null, (data.results[2] as com.glassous.superbox.data.CurrencySuccess).conversion.rateDate)
+        } finally { server.stop(0) }
+    }
+
+    @Test fun invalidBatchSelectionIsRejectedBeforeNetworking() {
+        for (targets in listOf(emptyList(), List(51) { "USD" }, listOf("USD", "usd"))) {
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { ApiClient("http://127.0.0.1:1").convertCurrencies("1", "CNY", targets, 2) }
+            }
+        }
+    }
+
+    @Test fun networkFailureUsesSimpleMessage() {
+        val cause = assertThrows(ApiException::class.java) {
+            runBlocking { ApiClient("http://127.0.0.1:1").convertCurrency("1", "CNY", "USD", 2) }
+        }
+        assertEquals("连接失败，请检查网络后重试", cause.message)
+    }
+
+    @Test fun currencyNamesHaveChineseDisplayAndFallback() {
+        assertEquals("美元", com.glassous.superbox.data.CurrencyInfo("USD", "Dollar").localizedName())
+        assertEquals("Unknown", com.glassous.superbox.data.CurrencyInfo("ZZZ", "Unknown").localizedName())
+    }
+
     @Test fun newToolsUseExpectedGetJsonAndMultipartContracts() = runBlocking {
         val requests = mutableListOf<Pair<String, String>>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

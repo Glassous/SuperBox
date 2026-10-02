@@ -177,7 +177,7 @@ def test_skill_json_manifest():
         "json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"
     ]
     endpoints = manifest["endpoints"]
-    assert manifest["endpoints_total"] == len(endpoints) == 20
+    assert manifest["endpoints_total"] == len(endpoints) == 21
     by_path = {endpoint["path"]: endpoint for endpoint in endpoints}
     for endpoint in endpoints:
         assert endpoint["url"] == f"http://testserver/api/v1{endpoint['path']}"

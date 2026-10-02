@@ -45,11 +45,11 @@ object LocalToolRegistry {
         ) { api, tool, onBack -> ExifScreen(api, tool, onBack) },
         LocalToolDefinition(
             "time", "tool/time",
-            ToolInfo("time", "当前时间", "时间日期", "获取服务器当前日期和时间，自动转换为东八区。", listOf("时间", "日期", "东八区")),
+            ToolInfo("time", "当前时间", "时间日期", "获取当前日期和时间，自动转换为东八区。", listOf("时间", "日期", "东八区")),
         ) { api, tool, onBack -> TimeScreen(api, tool, onBack) },
         LocalToolDefinition(
             "currency", "tool/currency",
-            ToolInfo("currency", "汇率转换", "数据处理", "使用每日参考汇率转换金额并返回汇率日期和来源。", listOf("汇率", "货币", "人民币", "美元")),
+            ToolInfo("currency", "汇率转换", "数据处理", "使用每日参考汇率，将金额兑换为一种或多种货币。", listOf("汇率", "货币", "人民币", "美元")),
         ) { api, tool, onBack -> CurrencyScreen(api, tool, onBack) },
         LocalToolDefinition(
             "documents", "tool/documents",

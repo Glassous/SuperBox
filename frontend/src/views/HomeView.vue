@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
       <div v-if="error" class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300" role="alert">
         {{ error }} <button class="ml-3 font-bold underline" @click="loadTools">重试</button>
       </div>
-      <div v-else-if="loading" class="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-4" aria-label="正在加载工具">
+      <div v-else-if="loading" class="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-4" aria-label="正在处理">
         <div v-for="i in 4" :key="i" class="h-53 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/5"></div>
       </div>
       <div v-else-if="tools.length === 0" class="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center dark:border-white/10 dark:bg-white/5">

@@ -25,7 +25,7 @@ const fetchExample = computed(() => {
       : `form.append('${field.name}', ${JSON.stringify(operation.exampleBody[field.name] ?? '')});`).join('\n')
     return `const form = new FormData();\n${fields}\nconst response = await fetch('${endpointUrl.value}', { method: 'POST', body: form });\n${operation.binaryResponse ? 'const file = await response.blob();' : 'const data = await response.json();'}`
   }
-  const example = Object.fromEntries(operation.fields.map(field => [field.name, field.type === 'integer' ? Number(operation.exampleBody[field.name]) : operation.exampleBody[field.name]]))
+  const example = apiExampleBody(operation)
   const body = JSON.stringify(example, null, 2).replace(/\n/g, '\n  ')
   return `const response = await fetch('${endpointUrl.value}', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(${body}),\n});\nconst data = await response.json();`
 })
@@ -63,7 +63,7 @@ async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
                   <code class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-slate-700 dark:text-slate-200">{{ endpointUrl }}</code>
                   <button type="button" class="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200" @click="copy(endpointUrl, 'endpoint')">{{ copied === 'endpoint' ? '已复制' : '复制' }}</button>
                 </div>
-                <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ currentOperation.multipart ? '使用 multipart/form-data，图片文件与图片链接二选一，由浏览器设置 Content-Type。' : currentOperation.method === 'GET' ? '查询参数通过 URL 传递。' : '请求头：Content-Type: application/json。' }}当前接口无需认证。</p>
+                <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{{ currentOperation.multipart ? '使用 multipart/form-data，文件与公开链接二选一，由浏览器设置 Content-Type。' : currentOperation.method === 'GET' ? '查询参数通过 URL 传递。' : '请求头：Content-Type: application/json。' }}当前接口无需认证。</p>
               </section>
 
               <section>

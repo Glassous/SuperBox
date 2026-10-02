@@ -14,7 +14,7 @@ onMounted(refresh)
 </script>
 <template>
   <div class="space-y-6">
-    <p class="text-sm text-slate-500">时间由服务器获取，自动转换为东八区。结果为获取时的时间，点击刷新可重新获取。</p>
+    <p class="text-sm text-slate-500">显示东八区日期和时间，点击刷新可获取最新时间。</p>
     <button class="tool-button" :disabled="loading" @click="refresh">刷新时间</button>
     <ResultBox :value="result" :error="error" :loading="loading" />
   </div>

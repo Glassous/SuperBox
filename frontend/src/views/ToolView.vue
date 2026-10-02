@@ -56,7 +56,7 @@ onBeforeUnmount(() => controller?.abort())
 <template>
   <div>
     <div v-if="error" class="mt-9 rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300" role="alert">{{ error }}</div>
-    <div v-else-if="!tool" class="mt-9 h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/5" aria-label="正在加载工具"></div>
+    <div v-else-if="!tool" class="mt-9 h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/5" aria-label="正在处理"></div>
     <template v-else>
       <div ref="detail" data-tool-transition-detail class="flex flex-col gap-5 sm:flex-row sm:items-center">
         <div data-tool-transition="icon"><ToolMark :slug="tool.slug" size="lg" /></div>
@@ -67,7 +67,7 @@ onBeforeUnmount(() => controller?.abort())
         </div>
       </div>
       <div ref="body" class="mt-9">
-        <div v-if="loading" class="h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/5" aria-label="正在加载工具"></div>
+        <div v-if="loading" class="h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/5" aria-label="正在处理"></div>
         <component :is="forms[tool.slug as keyof typeof forms]" v-else-if="tool.slug in forms" :key="tool.slug" />
         <div v-else class="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 dark:border-white/10 dark:bg-[#141a2c]">该工具页面暂未配置。</div>
       </div>

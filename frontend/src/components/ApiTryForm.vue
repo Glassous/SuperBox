@@ -46,7 +46,6 @@ async function sendRequest() {
     status.value = 200
   } catch (cause) {
     if (current !== requestId) return
-    if (current !== requestId) return
     if (cause instanceof ApiError) {
       error.value = cause.message
       status.value = cause.status ?? null
