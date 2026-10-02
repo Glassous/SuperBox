@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { editExif, inspectExif, searchExifTags } from '../api/client'
+import { downloadFile, editExif, inspectExif, searchExifTags, type FileResult } from '../api/client'
 import type { ExifCatalogTag, ExifChange, ExifTag } from '../types'
 
 const MAX_BYTES = 20 * 1024 * 1024
@@ -22,6 +22,7 @@ const error = ref('')
 const message = ref('')
 const loading = ref(false)
 const saving = ref(false)
+const output = ref<FileResult | null>(null)
 const searching = ref(false)
 let inspectController: AbortController | undefined
 let searchController: AbortController | undefined
@@ -90,6 +91,7 @@ async function loadSource(source: File | string, name: string) {
   const controller = new AbortController()
   inspectController = controller
   const current = ++generation
+  output.value = null
   discard()
   tags.value = []
   format.value = ''
@@ -193,19 +195,14 @@ async function download() {
   error.value = ''
   message.value = ''
   try {
-    const blob = await editExif(source, pending)
+    const result = await editExif(source, pending)
     const extension = format.value === 'JPEG' ? 'jpg' : format.value.toLowerCase()
     const stem = sourceName.value.replace(/\.[^.]+$/, '') || 'image'
-    const name = `${stem}-exif.${extension}`
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = name
-    anchor.click()
-    setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    await loadSource(new File([blob], name, { type: blob.type }), name)
+    downloadFile(result)
+    await loadSource(result.url, result.filename)
+    output.value = result
     sourceName.value = stem + '.' + extension
-    message.value = '已下载编辑后的图片，当前内容已更新。'
+    message.value = error.value ? '编辑后的图片已生成，但重新读取 EXIF 失败。可通过文件地址下载。' : '已生成编辑后的图片并发起下载，当前内容已更新。'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '编辑或下载失败，请重试。'
   } finally {
@@ -228,7 +225,7 @@ onBeforeUnmount(() => {
       <div class="p-6">
         <input ref="fileInput" class="sr-only" type="file" :disabled="saving" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" aria-label="选择图片" @change="chooseFile" />
         <button type="button" :disabled="saving" class="w-full rounded-xl border-2 border-dashed border-indigo-200 px-5 py-5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-400/30 dark:hover:bg-indigo-400/5" @click="fileInput?.click()">选择 JPEG、PNG 或 WebP 图片</button>
-        <p class="mt-2 text-xs text-slate-500">单张图片，最大 20 MB。也可使用图片链接，即时处理，不长期保存。</p>
+        <p class="mt-2 text-xs text-slate-500">单张图片，最大 20 MB。也可使用图片链接，编辑后的文件保留 2 小时。</p>
         <div class="mt-5 border-t border-slate-100 pt-5 dark:border-white/10">
           <label for="exif-image-url" class="text-xs font-semibold text-slate-600 dark:text-slate-300">或使用图片链接</label>
           <div class="mt-2 flex gap-2">
@@ -244,6 +241,7 @@ onBeforeUnmount(() => {
         <div v-if="loading" class="mt-4 text-sm text-slate-500" role="status">正在处理…</div>
         <div v-if="error" class="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300" role="alert">{{ error }}</div>
         <div v-if="message" class="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">{{ message }}</div>
+        <p v-if="output" class="mt-3 text-xs text-slate-500">文件保留 2 小时，到期时间：{{ new Date(output.expires_at).toLocaleString() }}。<a :href="output.url" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">下载文件</a></p>
         <div class="mt-5 flex flex-wrap items-center gap-2">
           <button type="button" :disabled="!format || !changes.length || loading || saving" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50" @click="download">{{ saving ? '编辑中…' : `编辑并下载${changes.length ? `（${changes.length} 项）` : ''}` }}</button>
           <button v-if="changes.length" type="button" :disabled="saving" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold dark:border-white/15" @click="discard">撤销修改</button>

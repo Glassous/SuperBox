@@ -14,6 +14,7 @@ from app.schemas import (
     ExifCatalogResult,
     ExifChange,
     ExifInspectResult,
+    FileResult,
     HealthResult,
     IsoDateTimeInput,
     JsonValidationResult,
@@ -26,7 +27,7 @@ from app.schemas import (
     CurrentTimeResult, CurrencyInput, CurrencyCatalogResult, CurrencyResult, DocumentResult,
     CurrencyBatchInput, CurrencyBatchResult,
 )
-from app import exif, image_source, services, current_time, currency, documents
+from app import exif, image_source, services, current_time, currency, documents, file_storage
 
 
 router = APIRouter(
@@ -210,12 +211,13 @@ def exif_tags(q: str = Query(default="", max_length=100)) -> dict:
     return {"tags": exif.available_tags(q)}
 
 
-@router.post("/exif/edit", tags=["EXIF"], responses={200: {"content": {"image/jpeg": {}, "image/png": {}, "image/webp": {}}}})
+@router.post("/exif/edit", response_model=FileResult, tags=["EXIF"],
+             responses={413: {"model": ErrorResponse}, 503: {"model": ErrorResponse}})
 def exif_edit(
     changes: str = Form(...),
     image: UploadFile | None = File(default=None),
     image_url: str = Form(default="", max_length=image_source.MAX_URL_LENGTH),
-) -> Response:
+) -> dict:
     try:
         parsed = TypeAdapter(list[ExifChange]).validate_python(json.loads(changes))
     except (ValueError, ValidationError) as exc:
@@ -223,7 +225,4 @@ def exif_edit(
     output, mime_type, suffix = exif.edit(
         _request_bytes(image, image_url), [item.model_dump() for item in parsed]
     )
-    return Response(
-        content=output, media_type=mime_type,
-        headers={"Content-Disposition": f'attachment; filename="edited-exif{suffix}"'},
-    )
+    return file_storage.upload(output, f"edited-exif{suffix}", mime_type)

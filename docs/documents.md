@@ -14,10 +14,10 @@ curl -X POST http://localhost:8087/api/v1/documents/convert -F 'file_url=https:/
 ```
 
 ```json
-{"result":"## 第 1 页\n\n示例正文","format":"markdown","filename":"report.md","source_type":"pdf","stats":{"pages":1,"worksheets":0,"cells":0,"characters":14},"warnings":[]}
+{"result":"## 第 1 页\n\n示例正文","format":"markdown","filename":"report.md","source_type":"pdf","stats":{"pages":1,"worksheets":0,"cells":0,"characters":14},"warnings":[],"url":"https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/report.md","content_type":"text/markdown; charset=utf-8","size":26,"expires_at":"2026-10-03T06:00:00Z"}
 ```
 
-结果是 JSON 文本，不是二进制下载。客户端将 `result` 以 UTF-8 保存为 `filename`；服务端处理结束清理临时文件，不提供长期下载链接。`stats` 包含页数、工作表数、遍历单元格数、输出字符数；不适用的统计为 0。
+结果为 JSON，`result` 正文保留用于预览和复制；通过 `url` 下载已上传 COS 的 UTF-8 Markdown/TXT 文件。`content_type` 为文件 MIME，`size` 为字节数，`expires_at` 为 UTC 到期时间。文件保留 2 小时，服务端每分钟删除过期对象；停机或删除失败时延迟清理，恢复后补清理。输入临时文件仍在处理结束后清理。`stats` 包含页数、工作表数、遍历单元格数、输出字符数；不适用的统计为 0。
 
 ## 提取行为
 
@@ -44,3 +44,5 @@ PDF 最多 100 页；XLSX 最多 20 个工作表及累计 50,000 个遍历单元
 | 429 | TOOL_BUSY | 正在转换其他文件；Retry-After 为 2 秒 |
 | 503 | DOCUMENT_UNAVAILABLE | 资源限制或处理进程不可用 |
 | 504 | DOCUMENT_TIMEOUT | CPU 或解析时间超限 |
+| 503 | COS_UNAVAILABLE | COS 配置缺失、无效或无法初始化 |
+| 503 | COS_UPLOAD_FAILED | 处理后的文件上传失败 |

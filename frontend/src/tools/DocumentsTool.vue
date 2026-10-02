@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import ResultBox from '../components/ResultBox.vue'
-import { convertDocument, saveBlob, type DocumentResult } from '../api/client'
+import { convertDocument, downloadFile, type DocumentResult } from '../api/client'
 import { useToolTask } from '../composables/useToolTask'
 const mode = ref('upload'), file = ref<File | null>(null), link = ref(''), format = ref('markdown')
 const output = ref<DocumentResult | null>(null)
@@ -20,7 +20,7 @@ function convert() {
   })
 }
 function save() {
-  if (output.value) saveBlob(new Blob([output.value.result], { type: `${output.value.format === 'markdown' ? 'text/markdown' : 'text/plain'};charset=utf-8` }), output.value.filename)
+  if (output.value) downloadFile(output.value)
 }
 </script>
 <template>
@@ -35,6 +35,7 @@ function save() {
       <button class="tool-button" :disabled="loading" @click="convert">开始转换</button>
       <button v-if="output" class="tool-button ml-3" @click="save">保存 {{ output.filename }}</button>
       <p v-if="output" class="text-sm text-slate-500">{{ output.stats.characters }} 字符 · {{ output.stats.pages }} 页 · {{ output.stats.worksheets }} 工作表</p>
+      <p v-if="output" class="text-xs text-slate-500">文件保留 2 小时，到期时间：{{ new Date(output.expires_at).toLocaleString() }}。<a :href="output.url" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">下载文件</a></p>
       <p v-for="warning in output?.warnings" :key="warning" class="text-sm text-amber-700 dark:text-amber-300">{{ warning }}</p>
     </section>
     <ResultBox :value="result" :error="error" :loading="loading" />

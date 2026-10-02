@@ -19,8 +19,6 @@ export interface ApiOperation {
   note?: string
   method?: 'GET' | 'POST'
   multipart?: boolean
-  binaryResponse?: boolean
-  downloadName?: string
 }
 
 export interface ApiToolDoc {
@@ -75,8 +73,8 @@ export const apiDocs: ApiToolDoc[] = [
         { name: 'file_url', label: '公开文件链接', type: 'url', description: '与 file 二选一，最多 2048 字符，仅公开 HTTP/HTTPS 地址。' },
         { name: 'format', label: '输出格式', type: 'string', description: 'markdown（默认）或 txt。', options: [{ value: 'markdown', label: 'Markdown' }, { value: 'txt', label: 'TXT' }] },
       ], exampleBody: { file_url: '', format: 'markdown' },
-      exampleResponse: { result: '## 第 1 页\n\n示例正文', format: 'markdown', filename: 'document.md', source_type: 'pdf', stats: { pages: 1, worksheets: 0, cells: 0, characters: 14 }, warnings: [] },
-      note: '返回 JSON 文本，客户端自行保存文件。最多 100 页 PDF、20 工作表、累计 50,000 单元格、500,000 字符；Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1，内存 256 MiB、CPU 10 秒、解析 15 秒。不支持 OCR、DOC/XLS、宏、加密或复杂排版；不执行公式。超限报错，不截断。' }],
+      exampleResponse: { result: '## 第 1 页\n\n示例正文', format: 'markdown', filename: 'document.md', source_type: 'pdf', stats: { pages: 1, worksheets: 0, cells: 0, characters: 14 }, warnings: [], url: 'https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/document.md', content_type: 'text/markdown; charset=utf-8', size: 30, expires_at: '2026-10-03T06:00:00Z' },
+      note: '返回 JSON，包含正文和 COS 下载地址 url、content_type、size（字节）、expires_at（UTC）；文件保留 2 小时。最多 100 页 PDF、20 工作表、累计 50,000 单元格、500,000 字符；Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1，内存 256 MiB、CPU 10 秒、解析 15 秒。不支持 OCR、DOC/XLS、宏、加密或复杂排版；不执行公式。超限报错，不截断。' }],
   },
   {
     slug: 'exif',
@@ -102,16 +100,16 @@ export const apiDocs: ApiToolDoc[] = [
         exampleResponse: { tags: [{ key: 'ExifIFD:DateTimeOriginal', group: 'ExifIFD', name: 'DateTimeOriginal', type: 'string', writable: true }] },
       },
       {
-        id: 'edit', name: '编辑并下载', summary: '上传原图或提供图片链接和标签操作，返回修改后的原格式图片。',
-        path: '/exif/edit', multipart: true, binaryResponse: true,
+        id: 'edit', name: '编辑并下载', summary: '上传原图或提供图片链接和标签操作，返回修改后的原格式图片下载地址。',
+        path: '/exif/edit', multipart: true,
         fields: [
           { name: 'image', label: '图片文件', type: 'file', accept: '.jpg,.jpeg,.png,.webp', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
           { name: 'image_url', label: '图片链接', type: 'url', description: '与 image 二选一，http/https 公开链接，最大 20 MB。' },
           { name: 'changes', label: '标签操作', type: 'JSON string', description: '必填，1 至 100 项；每项包含 key、action（set/delete），set 时包含 value。', multiline: true },
         ],
         exampleBody: { image: '<选择图片文件>', image_url: 'https://example.com/photo.jpg', changes: JSON.stringify([{ key: 'IFD0:Make', action: 'set', value: 'Superbox' }]) },
-        exampleResponse: { type: 'image/jpeg | image/png | image/webp', download: 'edited-exif.<原格式扩展名>' },
-        note: '仅修改安全可写的 EXIF 标签；图片像素不重新编码。图片链接由服务端下载，仅支持公开可访问的 http/https 地址，不指向内网。响应为二进制图片，请作为文件保存。',
+        exampleResponse: { url: 'https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/edited-exif.jpg', filename: 'edited-exif.jpg', content_type: 'image/jpeg', size: 12345, expires_at: '2026-10-03T06:00:00Z' },
+        note: '仅修改安全可写的 EXIF 标签；图片像素不重新编码。图片链接由服务端下载，仅支持公开可访问的 http/https 地址，不指向内网。成功返回 JSON，请通过 url 下载；size 单位为字节，expires_at 为 UTC。文件保留 2 小时，COS 不可用或上传失败返回 503。',
       },
     ],
   },
@@ -263,8 +261,8 @@ export function apiExampleBody(operation: ApiOperation): Record<string, unknown>
 export function makeAiPrompt(doc: ApiToolDoc, baseUrl: string): string {
   const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operation.path}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(apiExampleBody(operation))}；成功响应示例 ${JSON.stringify(operation.exampleResponse)}`).join('\n')
   const transport = doc.operations.some(operation => operation.multipart)
-    ? '文件接口使用 multipart/form-data，文件与公开链接二选一；不要手工设置 multipart 的 Content-Type，让客户端生成 boundary。只有标记为 binaryResponse 的接口返回二进制，其余返回 JSON。'
+    ? '文件接口使用 multipart/form-data，文件与公开链接二选一；不要手工设置 multipart 的 Content-Type，让客户端生成 boundary。所有工具接口返回 JSON。文件输出包含 COS 下载地址 url、filename、content_type、size 和 expires_at，文件保留 2 小时。'
     : 'GET 无请求体；POST 使用 JSON，Content-Type: application/json。各字段类型以接口文档为准。'
   const notes = doc.operations.map(operation => operation.note).filter(Boolean).join('\n')
-  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${transport} 当前接口不需要认证。\n${endpoints}\n${notes}\n\n请补齐请求与响应类型、调用函数、加载与错误状态。HTTP 400 / INVALID_INPUT，422 / VALIDATION_ERROR，413 表示容量超限，429 / TOOL_BUSY，503 表示服务不可用，504 / DOCUMENT_TIMEOUT；依据 HTTP 状态和 code 处理，不解析中文提示。API 地址放在环境配置中。文件转换结果的 result 为 UTF-8 文本，可保存为 filename。金额精度运算全部交给服务器。如果我还没有提供项目技术栈或目标页面，先向我确认。`
+  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${transport} 当前接口不需要认证。\n${endpoints}\n${notes}\n\n请补齐请求与响应类型、调用函数、加载与错误状态。HTTP 400 / INVALID_INPUT，422 / VALIDATION_ERROR，413 表示容量超限，429 / TOOL_BUSY，503 表示服务不可用，504 / DOCUMENT_TIMEOUT；依据 HTTP 状态和 code 处理，不解析中文提示。API 地址放在环境配置中。文件转换结果的 result 用于预览和复制；保存文件时通过 url 下载，expires_at 为 UTC 到期时间。金额精度运算全部交给服务器。如果我还没有提供项目技术栈或目标页面，先向我确认。`
 }

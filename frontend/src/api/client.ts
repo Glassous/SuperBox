@@ -66,7 +66,11 @@ export function getToolResult<T>(path: string, signal?: AbortSignal): Promise<T>
   return request<T>(path, { signal, cache: 'no-store' })
 }
 
-export interface DocumentResult {
+export interface FileResult {
+  url: string; filename: string; content_type: string; size: number; expires_at: string
+}
+
+export interface DocumentResult extends FileResult {
   result: string; format: 'markdown' | 'txt'; filename: string; source_type: string
   stats: Record<string, number>; warnings: string[]
 }
@@ -89,14 +93,16 @@ export function convertCurrencies(amount: string, from: string, targets: string[
   }, signal)
 }
 
-export function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob)
+export function downloadFile(file: FileResult) {
   const anchor = document.createElement('a')
-  anchor.href = url; anchor.download = name; anchor.click()
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  anchor.href = file.url
+  anchor.download = file.filename
+  anchor.target = '_blank'
+  anchor.rel = 'noopener noreferrer'
+  anchor.click()
 }
 
-export async function executeOperation(operation: ApiOperation, values: Record<string, string>, file?: File | null, signal?: AbortSignal): Promise<unknown | Blob> {
+export async function executeOperation(operation: ApiOperation, values: Record<string, string>, file?: File | null, signal?: AbortSignal): Promise<unknown> {
   let path = operation.path
   const method = operation.method ?? 'POST'
   let body: BodyInit | undefined
@@ -126,7 +132,7 @@ export async function executeOperation(operation: ApiOperation, values: Record<s
     const error = await response.json().catch(() => ({})) as ApiErrorBody
     throw new ApiError(error.message || '请求失败。', response.status, error.code)
   }
-  return operation.binaryResponse ? response.blob() : response.json()
+  return response.json()
 }
 
 export async function convertDocument(source: File | string, format: string, signal?: AbortSignal): Promise<DocumentResult> {
@@ -164,9 +170,9 @@ export function searchExifTags(q = '', signal?: AbortSignal): Promise<{ tags: Ex
   return request(`/exif/tags?q=${encodeURIComponent(q)}`, { signal })
 }
 
-export async function editExif(source: File | string, changes: ExifChange[]): Promise<Blob> {
+export async function editExif(source: File | string, changes: ExifChange[]): Promise<FileResult> {
   const form = new FormData()
   form.append(typeof source === 'string' ? 'image_url' : 'image', source)
   form.append('changes', JSON.stringify(changes))
-  return (await multipartRequest('/exif/edit', form)).blob()
+  return (await multipartRequest('/exif/edit', form)).json() as Promise<FileResult>
 }

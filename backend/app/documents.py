@@ -10,6 +10,7 @@ from starlette.responses import JSONResponse
 
 from app.services import ToolInputError
 from app.tool_errors import ToolFailure
+from app import file_storage
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_BODY_BYTES = 6 * 1024 * 1024
@@ -134,4 +135,7 @@ async def convert(file, file_url, fmt, request):
                     target.write(chunk)
         if not link and path.stat().st_size == 0:
             raise ToolInputError("文件不能为空")
-        return await run_worker(path, fmt, name, request, file_url=link)
+        result = await run_worker(path, fmt, name, request, file_url=link)
+        content_type = "text/markdown; charset=utf-8" if fmt == "markdown" else "text/plain; charset=utf-8"
+        result.update(await file_storage.upload_file(result["result"].encode("utf-8"), result["filename"], content_type))
+        return result

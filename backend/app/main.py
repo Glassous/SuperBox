@@ -9,12 +9,14 @@ from app.exif import ExifUnavailableError
 from app.services import ToolInputError
 from app.tool_errors import ToolFailure
 from app.documents import DocumentAdmission
+from app.file_storage import lifespan
 
 
 app = FastAPI(
     title="Superbox API",
     description="工具箱的版本化 HTTP 接口。所有工具计算均在服务端完成。",
-    version="1.2.0",
+    version="1.3.0",
+    lifespan=lifespan,
     openapi_url="/api/v1/openapi.json",
 )
 

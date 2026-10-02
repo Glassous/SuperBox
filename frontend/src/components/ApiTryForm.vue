@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { ApiError, executeOperation, saveBlob } from '../api/client'
+import { ApiError, executeOperation, type FileResult } from '../api/client'
 import type { ApiOperation } from '../data/apiDocs'
 
 const props = defineProps<{ operation: ApiOperation }>()
@@ -10,6 +10,7 @@ const status = ref<number | null>(null)
 const error = ref('')
 const loading = ref(false)
 const selectedFile = ref<File | null>(null)
+const outputFile = ref<FileResult | null>(null)
 let requestId = 0
 let controller: AbortController | undefined
 onBeforeUnmount(() => { requestId++; controller?.abort() })
@@ -23,12 +24,14 @@ watch(() => props.operation, operation => {
   error.value = ''
   loading.value = false
   selectedFile.value = null
+  outputFile.value = null
 }, { immediate: true })
 
 async function sendRequest() {
   const current = ++requestId
   loading.value = true
   responseText.value = ''
+  outputFile.value = null
   error.value = ''
   status.value = null
   try {
@@ -36,11 +39,8 @@ async function sendRequest() {
     controller = new AbortController()
     const response = await executeOperation(props.operation, values.value, selectedFile.value, controller.signal)
     if (current !== requestId) return
-    if (response instanceof Blob) {
-      saveBlob(response, props.operation.downloadName ?? `edited-exif.${response.type.split('/')[1] === 'jpeg' ? 'jpg' : response.type.split('/')[1]}`)
-      responseText.value = `文件已下载（${response.size} 字节，${response.type}）`
-      status.value = 200
-      return
+    if (response && typeof response === 'object' && 'url' in response && 'expires_at' in response && 'filename' in response) {
+      outputFile.value = response as FileResult
     }
     responseText.value = JSON.stringify(response, null, 2)
     status.value = 200
@@ -85,5 +85,6 @@ async function sendRequest() {
       <div v-else-if="error" class="p-4 text-sm text-rose-600 dark:text-rose-300" role="alert">{{ error }}</div>
       <div v-else class="p-4 text-xs text-slate-400">填写参数后发送请求，响应会显示在这里。</div>
     </div>
+    <p v-if="outputFile" class="mt-3 text-xs text-slate-500">文件保留 2 小时，到期时间：{{ new Date(outputFile.expires_at).toLocaleString() }}。<a :href="outputFile.url" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">下载 {{ outputFile.filename }}</a></p>
   </section>
 </template>

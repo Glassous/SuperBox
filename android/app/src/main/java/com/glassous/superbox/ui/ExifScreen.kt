@@ -196,7 +196,7 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                             enabled = !saving,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("选择 JPEG、PNG 或 WebP 图片") }
-                        Text("单张图片，最大 20 MB。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("单张图片，最大 20 MB。编辑后的文件保留 2 小时。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         image?.let { selected ->
                             val bitmap = remember(selected) { previewBitmap(selected.bytes) }
                             if (bitmap != null) Image(
@@ -226,10 +226,9 @@ fun ExifScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
                                     message = null
                                     try {
                                         val result = api.editExif(selected.name, selected.bytes, changes)
-                                        val extension = when (inspection?.format) { "JPEG" -> "jpg"; "PNG" -> "png"; else -> "webp" }
-                                        val name = "${selected.name.substringBeforeLast('.', selected.name)}-exif.$extension"
-                                        pendingOutput = LocalImage(name, result)
-                                        val mime = when (extension) { "jpg" -> "image/jpeg"; "png" -> "image/png"; else -> "image/webp" }
+                                        val name = result.filename
+                                        pendingOutput = LocalImage(name, api.downloadFile(result))
+                                        val mime = result.contentType
                                         saver.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                                             addCategory(Intent.CATEGORY_OPENABLE)
                                             type = mime

@@ -46,8 +46,9 @@ fun DocumentsScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
         if (uri != null && current != null) scope.launch {
             saving = true; message = null
             try {
+                val bytes = api.downloadFile(current.file)
                 withContext(Dispatchers.IO) {
-                    resolver.openOutputStream(uri, "w")?.use { it.write(current.result.toByteArray(Charsets.UTF_8)) }
+                    resolver.openOutputStream(uri, "w")?.use { it.write(bytes) }
                         ?: throw IllegalStateException("无法写入选定位置")
                 }
                 message = "文件已保存"
@@ -80,6 +81,7 @@ fun DocumentsScreen(api: ApiClient, tool: ToolInfo, onBack: () -> Unit) {
             }) { Text("开始转换") }
             output?.let { current ->
                 HelperText("${current.characters} 字符 · ${current.filename}")
+                HelperText("文件保留 2 小时，到期时间（UTC）：${current.file.expiresAt}")
                 current.warnings.forEach { HelperText(it) }
                 Button(enabled = !saving, onClick = { saver.launch(current.filename) }) { Text(if (saving) "保存中…" else "保存文件") }
             }

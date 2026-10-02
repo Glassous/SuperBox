@@ -1,6 +1,6 @@
 # 图片 EXIF 编辑 API
 
-支持 JPEG、PNG、WebP，单张图片最大 20 MiB。图片来源有两种：`multipart/form-data` 上传的 `image` 文件，或由服务端下载的 `image_url` 图片链接，两者只能提供其中一个。图片仅在单次请求期间保存在临时目录，请求结束后清理。服务端需安装 ExifTool；容器镜像已包含，其他部署可用 `EXIFTOOL_PATH` 指向可执行文件。
+支持 JPEG、PNG、WebP，单张图片最大 20 MiB。图片来源有两种：`multipart/form-data` 上传的 `image` 文件，或由服务端下载的 `image_url` 图片链接，两者只能提供其中一个。输入图片仅在单次请求期间保存在临时目录，请求结束后清理；编辑完成后的图片上传 COS，保留 2 小时并返回公开下载地址。服务端需安装 ExifTool；容器镜像已包含，其他部署可用 `EXIFTOOL_PATH` 指向可执行文件。
 
 ## `POST /api/v1/exif/inspect`
 
@@ -34,8 +34,7 @@ curl -X POST "http://localhost:8087/api/v1/exif/inspect" \
 ```bash
 curl -X POST "http://localhost:8087/api/v1/exif/edit" \
   -F "image_url=https://example.com/photo.jpg" \
-  -F 'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]' \
-  -o edited-exif.jpg
+  -F 'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]'
 ```
 
 `changes` 示例：
@@ -47,6 +46,14 @@ curl -X POST "http://localhost:8087/api/v1/exif/edit" \
 ]
 ```
 
-成功时返回原格式图片，`Content-Type` 为 `image/jpeg`、`image/png` 或 `image/webp`，`Content-Disposition` 带有下载文件名。失败时返回统一 JSON 错误：文件无效、标签只读、格式不支持写入、图片链接无效或无法下载为 400 `INVALID_INPUT`；请求字段无效为 422 `VALIDATION_ERROR`；图片超出 20 MiB 为 413 `FILE_TOO_LARGE`；ExifTool 不可用为 503 `EXIF_UNAVAILABLE`。
+成功时返回 JSON：
+
+```json
+{"url":"https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/edited-exif.jpg","filename":"edited-exif.jpg","content_type":"image/jpeg","size":12345,"expires_at":"2026-10-03T06:00:00Z"}
+```
+
+通过 `url` 下载原格式图片；`content_type` 为 `image/jpeg`、`image/png` 或 `image/webp`，`size` 为字节数，`expires_at` 为 UTC 到期时间。文件响应带有下载文件名和 `Cache-Control: no-store`。文件保留 2 小时，后台每分钟删除过期对象；停机或删除失败时延迟清理，恢复后补清理。
+
+失败时返回统一 JSON 错误：文件无效、标签只读、格式不支持写入、图片链接无效或无法下载为 400 `INVALID_INPUT`；请求字段无效为 422 `VALIDATION_ERROR`；图片超出 20 MiB 为 413 `FILE_TOO_LARGE`；ExifTool 不可用为 503 `EXIF_UNAVAILABLE`；COS 配置缺失或无效为 503 `COS_UNAVAILABLE`；上传失败为 503 `COS_UPLOAD_FAILED`。
 
 仅写 EXIF，不主动同步 XMP、IPTC。危险、二进制、厂商私有和结构性标签只读。写入在临时副本上进行，原始文件不会被修改；若目标格式不能写入指定标签，请求报错，不静默改写到其他元数据类型。

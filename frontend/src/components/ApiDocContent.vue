@@ -23,7 +23,7 @@ const fetchExample = computed(() => {
       ? `form.append('${field.name}', selectedFile); // 上传文件或改用下面的公开链接，二选一`
       : field.type === 'url' ? `// form.append('${field.name}', 'https://example.com/file');`
       : `form.append('${field.name}', ${JSON.stringify(operation.exampleBody[field.name] ?? '')});`).join('\n')
-    return `const form = new FormData();\n${fields}\nconst response = await fetch('${endpointUrl.value}', { method: 'POST', body: form });\n${operation.binaryResponse ? 'const file = await response.blob();' : 'const data = await response.json();'}`
+    return `const form = new FormData();\n${fields}\nconst response = await fetch('${endpointUrl.value}', { method: 'POST', body: form });\nconst data = await response.json();`
   }
   const example = apiExampleBody(operation)
   const body = JSON.stringify(example, null, 2).replace(/\n/g, '\n  ')

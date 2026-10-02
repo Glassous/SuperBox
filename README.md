@@ -66,6 +66,27 @@ GitHub Actions 部署流程会自动执行 `scripts/configure-site-fallback.sh`�
 
 `npm run build` 还会为每个前端路由生成目录索引（`dist/api-access/index.html`、`dist/tools/<slug>/index.html`）：即使站点暂时没有回退规则，这些直达链接也能打开。工具列表变化时构建会自动补齐，无需手工维护。
 
+## COS 文件输出配置
+
+EXIF 编辑和文件转换会把处理后的文件上传腾讯云 COS，并返回 `url`、`filename`、`content_type`、`size`（字节）及 `expires_at`（UTC ISO 8601）。文档转换仍返回 `result` 正文供预览和复制。网页与 Android 保存文件时使用 COS 地址。
+
+在 Compose 文件同目录创建 `.env`，可复制 `.env.production.example`，填写以下配置；生产服务器对应 `/opt/superbox/.env`：
+
+```dotenv
+# Tencent Cloud COS Configuration
+COS_SECRET_ID=
+COS_SECRET_KEY=
+COS_BUCKET=superbox-1350226447
+COS_REGION=ap-tokyo
+COS_CUSTOM_DOMAIN=superboxfiles.fiacloud.top
+```
+
+两个密钥填写实际值，不要保留占位符。Compose 自动读取 `.env` 并传入后端；直接运行 Python 后端时，需要先将这五项设置为进程环境变量，应用不会自动读取 `.env`。密钥仅用于后端，不能放入前端或 Android 配置。GitHub Actions 继续只更新服务器镜像地址，保留你手动填写的 COS 配置；修改后重建容器以加载新配置。
+
+存储桶须预先配置公开读取、关闭版本控制，并将 `superboxfiles.fiacloud.top` 绑定为 HTTPS 自定义源站域名。后端密钥需有目标桶的 `cos:PutObject`、`cos:GetBucket`（列举对象）、`cos:DeleteObject` 权限。若域名经过 CDN，须关闭该文件前缀的缓存并透传源站响应头，避免对象删除后继续命中缓存。应用不修改存储桶权限、域名或生命周期设置。
+
+输出文件只写入 `superbox-temp/` 专用前缀，保留 2 小时，应用启动后立即扫描，此后每分钟分页删除到期文件。到期时间和随机标识写入对象路径，容器重建后无需本地数据库即可补清理。正常运行时约有一分钟清理延迟；停机或 COS 删除失败时延迟清理，恢复后重试。其他桶内文件不受影响；已下载的本地文件继续保留。COS 配置不完整或上传失败时，文件输出接口返回 503，其他工具仍可使用。
+
 ## 验证
 
 ```powershell

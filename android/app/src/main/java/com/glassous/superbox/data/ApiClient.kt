@@ -58,7 +58,8 @@ data class CurrencyConversion(
     fun display(): String = "$amount $from = $result $to\n参考汇率：$rate\n参考日期：${rateDate ?: "同币种"}\n来源：${if (source == "identity") "同币种" else source}" +
         (if (stale) "\n暂用上次获取的数据" else "")
 }
-data class DocumentConversion(val result: String, val format: String, val filename: String, val warnings: List<String>, val characters: Int)
+data class ProcessedFile(val url: String, val filename: String, val contentType: String, val size: Long, val expiresAt: String)
+data class DocumentConversion(val result: String, val format: String, val filename: String, val warnings: List<String>, val characters: Int, val file: ProcessedFile)
 
 class ApiException(message: String, val status: Int? = null, val code: String? = null) : Exception(message)
 
@@ -200,7 +201,7 @@ class ApiClient(private val baseUrl: String) {
         write("--$boundary\r\nContent-Disposition: form-data; name=\"format\"\r\n\r\n$format\r\n--$boundary--\r\n")
         val response = JSONObject(String(request("documents/convert", "POST", "multipart/form-data; boundary=$boundary", body.toByteArray()), StandardCharsets.UTF_8))
         return DocumentConversion(response.getString("result"), response.getString("format"), response.getString("filename"),
-            response.getJSONArray("warnings").mapStrings(), response.getJSONObject("stats").getInt("characters"))
+            response.getJSONArray("warnings").mapStrings(), response.getJSONObject("stats").getInt("characters"), parseFile(response))
     }
 
     suspend fun validateJson(text: String): Pair<Boolean, String> =
@@ -259,9 +260,55 @@ class ApiClient(private val baseUrl: String) {
         json("exif/tags?q=${java.net.URLEncoder.encode(query, "UTF-8")}").getJSONArray("tags")
             .mapObjects { ExifCatalogTag(it.getString("key"), it.getString("name"), it.getBoolean("writable")) }
 
-    suspend fun editExif(filename: String, image: ByteArray, changes: List<ExifChange>): ByteArray {
+    private fun parseFile(response: JSONObject) = ProcessedFile(
+        response.getString("url"), response.getString("filename"), response.getString("content_type"),
+        response.getLong("size"), response.getString("expires_at"),
+    )
+
+    suspend fun editExif(filename: String, image: ByteArray, changes: List<ExifChange>): ProcessedFile {
         val (type, body) = multipart(filename, image, changes)
-        return request("exif/edit", "POST", type, body)
+        return parseFile(JSONObject(String(request("exif/edit", "POST", type, body), StandardCharsets.UTF_8)))
+    }
+
+    suspend fun downloadFile(file: ProcessedFile): ByteArray = withContext(Dispatchers.IO) {
+        val url = URL(file.url)
+        require(url.protocol == "https") { "文件下载地址必须使用 HTTPS" }
+        require(file.size in 0..(20L * 1024 * 1024)) { "下载文件超过大小限制" }
+        if (!java.time.Instant.now().isBefore(java.time.Instant.parse(file.expiresAt))) {
+            throw ApiException("文件下载地址已过期，请重新处理文件")
+        }
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 45_000
+            useCaches = false
+        }
+        val completion = currentCoroutineContext().job.invokeOnCompletion { connection.disconnect() }
+        try {
+            val status = connection.responseCode
+            if (status !in 200..299) throw ApiException(
+                if (status == 404) "文件已过期或不存在，请重新处理文件" else "文件下载失败（HTTP $status）", status,
+            )
+            val bytes = java.io.ByteArrayOutputStream()
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    if (bytes.size().toLong() + count > file.size) throw ApiException("下载文件大小与返回信息不一致")
+                    bytes.write(buffer, 0, count)
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            if (bytes.size().toLong() != file.size) throw ApiException("文件下载不完整，请重试")
+            bytes.toByteArray()
+        } catch (error: java.io.IOException) {
+            currentCoroutineContext().ensureActive()
+            throw ApiException("文件下载失败，请检查网络后重试")
+        } finally {
+            completion.dispose()
+            connection.disconnect()
+        }
     }
 }
 

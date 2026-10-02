@@ -27,4 +27,4 @@ Debug 构建在两处均未配置时使用 `http://10.0.2.2:8087`，适用于 An
 .\gradlew.bat :app:assembleRelease
 ```
 
-EXIF 选图与保存使用系统文件选择器，无需存储权限。支持 JPEG、PNG、WebP，文件不得超过 20 MB。后端需安装 ExifTool 才能处理 EXIF。
+EXIF 编辑和文档转换返回 COS 文件地址；保存时从返回地址下载，文档正文仍用于预览和复制。处理后的云端文件保留 2 小时，到期后清理；已下载到设备的文件不受影响。EXIF 选图与保存使用系统文件选择器，无需存储权限。支持 JPEG、PNG、WebP，文件不得超过 20 MB。后端需安装 ExifTool 才能处理 EXIF。

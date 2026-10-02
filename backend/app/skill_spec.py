@@ -21,7 +21,7 @@ class ErrorContractEntry(TypedDict):
     meaning: str
 
 
-SKILL_VERSION = "1.2.0"
+SKILL_VERSION = "1.3.0"
 
 SKILL_DESCRIPTION = (
     "Superbox 是由 FastAPI 提供工具能力的开发工具箱：JSON 格式化与校验、"
@@ -33,11 +33,12 @@ SKILL_DESCRIPTION = (
 
 CONVENTIONS = [
     "当前时间固定返回 UTC+08:00；既有时间戳转换接口仍返回 UTC。汇率是每日参考值，必须保留 rate_date、source 和 stale 信息。",
-    "文件转换使用 multipart/form-data：file 或 file_url 二选一，format 为 markdown（默认）或 txt；结果为 JSON 文本，客户端自行保存为文件。最大 5 MiB，不支持 OCR、DOC/XLS、宏或加密文件。",
+    "文件转换使用 multipart/form-data：file 或 file_url 二选一，format 为 markdown（默认）或 txt；结果为 JSON，保留 result 正文供预览和复制，并通过 url 下载 UTF-8 文件，保留 2 小时。最大 5 MiB，不支持 OCR、DOC/XLS、宏或加密文件。",
     "文本工具（JSON、Base64、URL、时间戳）使用 JSON 请求与响应：请求头 "
     "`Content-Type: application/json`，字符串输入长度为 1 至 1,000,000 个字符。",
     "图片 EXIF 工具使用 `multipart/form-data`，图片来源为 `image` 文件或 `image_url` 图片链接"
-    "（二选一），编辑接口返回二进制图片，需按文件保存。",
+    "（二选一），编辑接口返回 JSON，通过 url 下载原格式图片，文件保留 2 小时。",
+    "文件输出包含 url、filename、content_type、size（字节）、expires_at（UTC ISO 8601）；到期后服务端删除，正常运行时约有一分钟清理延迟，停机或删除失败后恢复补清理。",
     "时间戳值通过字符串传输，避免不同客户端对大整数或小数的精度差异。",
     "当前接口无需认证；CORS 允许所有来源，但不支持携带浏览器凭据的跨域请求。",
 ]
@@ -57,6 +58,8 @@ ERROR_CONTRACT: list[ErrorContractEntry] = [
     {"status": 404, "code": "NOT_FOUND", "meaning": "未知接口或工具"},
     {"status": 413, "code": "FILE_TOO_LARGE", "meaning": "图片超过 20 MiB，文档超过 5 MiB 或转换请求体超过 6 MiB"},
     {"status": 422, "code": "VALIDATION_ERROR", "meaning": "字段缺失、类型错误或超出长度限制"},
+    {"status": 503, "code": "COS_UNAVAILABLE", "meaning": "COS 配置缺失、无效或无法初始化"},
+    {"status": 503, "code": "COS_UPLOAD_FAILED", "meaning": "处理后的文件上传失败"},
     {"status": 503, "code": "EXIF_UNAVAILABLE", "meaning": "服务端 ExifTool 不可用"},
     {"status": 413, "code": "DOCUMENT_LIMIT_EXCEEDED", "meaning": "文档解压、页数、单元格、文本或内存超过限制"},
     {"status": 429, "code": "TOOL_BUSY", "meaning": "工具繁忙，稍后重试；文件转换同时仅处理一项"},
@@ -70,7 +73,7 @@ AI_GUIDANCE = [
     "校验 JSON 时读取 HTTP 200 响应中的 `valid` 字段；其余工具的无效输入返回 400，"
     "请按状态码分支处理。",
     "编辑图片前先用 `inspect` 或 `tags` 确认可写标签，再用 `edit` 提交 `changes`；"
-    "`edit` 返回二进制图片，需保存为文件。",
+    "`edit` 返回 JSON，使用 url 下载文件，并向用户提示 expires_at 到期时间。",
     "失败时依据 HTTP 状态与 `code` 处理，不要解析中文提示文本。",
     "需要程序化描述时读取 OpenAPI 定义，或调用工具目录接口动态发现能力。",
 ]
@@ -155,10 +158,10 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
         "method": "POST", "path": "/documents/convert", "name": "文档转 Markdown/TXT",
         "summary": "按需在受限子进程中提取 PDF、DOCX、XLSX 的文字与表格。",
         "request_format": "multipart",
-        "request": "multipart：file 上传或 file_url 公开 HTTP/HTTPS 链接二选一，format=markdown（默认）或 txt。最大 5 MiB、100 页 PDF、20 个工作表及累计 50,000 单元格、500,000 输出字符。Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1；子进程最多 256 MiB 内存、10 秒 CPU、15 秒总解析时间。超限报错，不截断。无 OCR、不支持 DOC/XLS、宏或加密文件；公式仅返回缓存结果，缺失时输出空值并警告。结果是 JSON，不是二进制下载。",
+        "request": "multipart：file 上传或 file_url 公开 HTTP/HTTPS 链接二选一，format=markdown（默认）或 txt。最大 5 MiB、100 页 PDF、20 个工作表及累计 50,000 单元格、500,000 输出字符。Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1；子进程最多 256 MiB 内存、10 秒 CPU、15 秒总解析时间。超限报错，不截断。无 OCR、不支持 DOC/XLS、宏或加密文件；公式仅返回缓存结果，缺失时输出空值并警告。返回 JSON 正文、统计、警告及 COS 文件地址 url、content_type、size、expires_at，文件保留 2 小时；通过 url 下载。",
         "request_example": 'curl -X POST "$BASE/api/v1/documents/convert" -F "file=@report.pdf" -F "format=markdown"',
         "request_language": "bash",
-        "response_example": '{"result":"## 第 1 页\\n\\n示例正文","format":"markdown","filename":"report.md","source_type":"pdf","stats":{"pages":1,"worksheets":0,"cells":0,"characters":14},"warnings":[]}',
+        "response_example": '{"result":"## 第 1 页\\n\\n示例正文","format":"markdown","filename":"report.md","source_type":"pdf","stats":{"pages":1,"worksheets":0,"cells":0,"characters":14},"warnings":[],"url":"https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/report.md","content_type":"text/markdown; charset=utf-8","size":26,"expires_at":"2026-10-03T06:00:00Z"}',
     }],
     "json": [
         {
@@ -321,30 +324,25 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
             "method": "POST",
             "path": "/exif/edit",
             "name": "编辑并下载",
-            "summary": "上传原图或提供图片链接与标签操作，返回修改后的原格式图片。",
+            "summary": "上传原图或提供图片链接与标签操作，返回修改后的原格式图片下载地址。",
             "request": (
                 "使用 multipart/form-data：原图为 `image` 文件或 `image_url` 图片链接"
                 "（二选一，链接限制同 inspect），`changes` 为 JSON 字符串，"
                 "包含 1 至 100 项操作；`key` 必须来自可写标签目录，`action` 为 "
                 "set 或 delete，set 必须提供非空 `value`（最多 4096 字符）。"
-                "仅修改 EXIF，不重新编码图片像素，结果作为文件下载。"
+                "仅修改 EXIF，不重新编码图片像素；返回 JSON，通过 url 下载原格式图片，文件保留 2 小时。"
             ),
             "request_format": "multipart",
             "request_example": (
                 'curl -X POST "$BASE/api/v1/exif/edit" -F "image=@photo.jpg" '
                 '-F \'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]\' '
-                "-o edited-exif.jpg\n"
+                "\n"
                 'curl -X POST "$BASE/api/v1/exif/edit" '
                 '-F "image_url=https://example.com/photo.jpg" '
                 '-F \'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]\' '
-                "-o edited-exif.jpg"
             ),
             "request_language": "bash",
-            "response_example": (
-                "二进制图片，Content-Type 为 image/jpeg、image/png 或 image/webp，"
-                'Content-Disposition 带有下载文件名如 edited-exif.jpg。'
-            ),
-            "response_language": "text",
+            "response_example": '{"url":"https://superboxfiles.fiacloud.top/superbox-temp/1791007200/0123456789abcdef0123456789abcdef/edited-exif.jpg","filename":"edited-exif.jpg","content_type":"image/jpeg","size":12345,"expires_at":"2026-10-03T06:00:00Z"}',
         },
     ],
 }

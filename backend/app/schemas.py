@@ -83,10 +83,17 @@ class CurrencyBatchResult(CurrencyAmountInput):
     results: list[Annotated[CurrencyBatchSuccess | CurrencyBatchError, Field(discriminator="status")]]
 
 
-class DocumentResult(BaseModel):
+class FileResult(BaseModel):
+    url: str
+    filename: str
+    content_type: str
+    size: int
+    expires_at: str
+
+
+class DocumentResult(FileResult):
     result: str
     format: Literal["markdown", "txt"]
-    filename: str
     source_type: Literal["pdf", "docx", "xlsx"]
     stats: dict[str, int]
     warnings: list[str]
