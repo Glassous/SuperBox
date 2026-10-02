@@ -29,9 +29,12 @@ async function sendRequest() {
   error.value = ''
   status.value = null
   try {
-    if (props.operation.multipart && !selectedFile.value) throw new Error('请先选择图片。')
+    const linkField = props.operation.fields.find(field => field.type === 'url')
+    const link = linkField ? (values.value[linkField.name] ?? '').trim() : ''
+    if (props.operation.multipart && !selectedFile.value && !link) throw new Error('请先选择图片文件或填写图片链接。')
+    const source = selectedFile.value ?? link
     if (props.operation.binaryResponse) {
-      const blob = await editExif(selectedFile.value!, JSON.parse(values.value.changes || '[]') as { key: string; action: 'set' | 'delete'; value?: string }[])
+      const blob = await editExif(source, JSON.parse(values.value.changes || '[]') as { key: string; action: 'set' | 'delete'; value?: string }[])
       if (current !== requestId) return
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -44,7 +47,7 @@ async function sendRequest() {
       return
     }
     const response = props.operation.path === '/exif/inspect'
-      ? await inspectExif(selectedFile.value!)
+      ? await inspectExif(source)
       : props.operation.path === '/exif/tags'
         ? await searchExifTags(values.value.q)
         : await postTool<Record<string, unknown>>(props.operation.path, values.value)
@@ -57,7 +60,8 @@ async function sendRequest() {
       error.value = cause.message
       status.value = cause.status ?? null
     } else {
-      error.value = '请求失败，请稍后重试。'
+      error.value = cause instanceof Error && cause.message ? cause.message : '请求失败，请稍后重试。'
+      status.value = null
     }
   } finally {
     if (current === requestId) loading.value = false

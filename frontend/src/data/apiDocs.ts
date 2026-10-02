@@ -45,10 +45,13 @@ export const apiDocs: ApiToolDoc[] = [
     description: '读取、编辑图片 EXIF 并下载原格式文件。',
     operations: [
       {
-        id: 'inspect', name: '读取 EXIF', summary: '上传图片并获取现有标签及可编辑状态。',
+        id: 'inspect', name: '读取 EXIF', summary: '上传图片或提供图片链接，获取现有标签及可编辑状态。',
         path: '/exif/inspect', multipart: true,
-        fields: [{ name: 'image', label: '图片', type: 'file', description: '必填，JPEG、PNG 或 WebP，最大 20 MB。' }],
-        exampleBody: { image: '<选择图片文件>' },
+        fields: [
+          { name: 'image', label: '图片文件', type: 'file', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
+          { name: 'image_url', label: '图片链接', type: 'url', description: '与 image 二选一，http/https 公开链接，最大 20 MB。' },
+        ],
+        exampleBody: { image: '<选择图片文件>', image_url: 'https://example.com/photo.jpg' },
         exampleResponse: { format: 'JPEG', tags: [{ key: 'IFD0:Make', group: 'IFD0', name: 'Make', value: 'Canon', writable: true, reason: '' }] },
       },
       {
@@ -59,15 +62,16 @@ export const apiDocs: ApiToolDoc[] = [
         exampleResponse: { tags: [{ key: 'ExifIFD:DateTimeOriginal', group: 'ExifIFD', name: 'DateTimeOriginal', type: 'string', writable: true }] },
       },
       {
-        id: 'edit', name: '编辑并下载', summary: '上传原图和标签操作，返回修改后的原格式图片。',
+        id: 'edit', name: '编辑并下载', summary: '上传原图或提供图片链接和标签操作，返回修改后的原格式图片。',
         path: '/exif/edit', multipart: true, binaryResponse: true,
         fields: [
-          { name: 'image', label: '图片', type: 'file', description: '必填，JPEG、PNG 或 WebP，最大 20 MB。' },
+          { name: 'image', label: '图片文件', type: 'file', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
+          { name: 'image_url', label: '图片链接', type: 'url', description: '与 image 二选一，http/https 公开链接，最大 20 MB。' },
           { name: 'changes', label: '标签操作', type: 'JSON string', description: '必填，1 至 100 项；每项包含 key、action（set/delete），set 时包含 value。', multiline: true },
         ],
-        exampleBody: { image: '<选择图片文件>', changes: JSON.stringify([{ key: 'IFD0:Make', action: 'set', value: 'Superbox' }]) },
+        exampleBody: { image: '<选择图片文件>', image_url: 'https://example.com/photo.jpg', changes: JSON.stringify([{ key: 'IFD0:Make', action: 'set', value: 'Superbox' }]) },
         exampleResponse: { type: 'image/jpeg | image/png | image/webp', download: 'edited-exif.<原格式扩展名>' },
-        note: '仅修改安全可写的 EXIF 标签；图片像素不重新编码。响应为二进制图片，请作为文件保存。',
+        note: '仅修改安全可写的 EXIF 标签；图片像素不重新编码。图片链接由服务端下载，仅支持公开可访问的 http/https 地址，不指向内网。响应为二进制图片，请作为文件保存。',
       },
     ],
   },
@@ -198,5 +202,5 @@ export const apiDocs: ApiToolDoc[] = [
 
 export function makeAiPrompt(doc: ApiToolDoc, baseUrl: string): string {
   const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operation.path}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(operation.exampleBody)}；成功响应示例 ${JSON.stringify(operation.exampleResponse)}`).join('\n')
-  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${doc.slug === 'exif' ? '图片接口使用 multipart/form-data 上传；编辑接口返回二进制图片，须保存为文件。' : '请求和响应均为 JSON；请求头使用 Content-Type: application/json。'}当前接口不需要认证。\n${endpoints}\n\n请为每个接口补齐请求与响应类型、调用函数、加载与错误状态，并给出一个最小使用示例和必要的测试。HTTP 400 表示 INVALID_INPUT，HTTP 422 表示 VALIDATION_ERROR；API 地址请放在环境配置中，不要写死在业务组件里。如果我还没有提供项目技术栈或目标页面，先向我确认。`
+  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${doc.slug === 'exif' ? '图片接口使用 multipart/form-data：图片通过 image 文件或 image_url 图片链接二选一提供；编辑接口返回二进制图片，须保存为文件。' : '请求和响应均为 JSON；请求头使用 Content-Type: application/json。'}当前接口不需要认证。\n${endpoints}\n\n请为每个接口补齐请求与响应类型、调用函数、加载与错误状态，并给出一个最小使用示例和必要的测试。HTTP 400 表示 INVALID_INPUT，HTTP 422 表示 VALIDATION_ERROR；API 地址请放在环境配置中，不要写死在业务组件里。如果我还没有提供项目技术栈或目标页面，先向我确认。`
 }

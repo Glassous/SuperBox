@@ -33,7 +33,8 @@ SKILL_DESCRIPTION = (
 CONVENTIONS = [
     "文本工具（JSON、Base64、URL、时间戳）使用 JSON 请求与响应：请求头 "
     "`Content-Type: application/json`，字符串输入长度为 1 至 1,000,000 个字符。",
-    "图片 EXIF 工具使用 `multipart/form-data` 上传，编辑接口返回二进制图片，需按文件保存。",
+    "图片 EXIF 工具使用 `multipart/form-data`，图片来源为 `image` 文件或 `image_url` 图片链接"
+    "（二选一），编辑接口返回二进制图片，需按文件保存。",
     "时间戳值通过字符串传输，避免不同客户端对大整数或小数的精度差异。",
     "当前接口无需认证；CORS 允许所有来源，但不支持携带浏览器凭据的跨域请求。",
 ]
@@ -243,15 +244,19 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
             "method": "POST",
             "path": "/exif/inspect",
             "name": "读取 EXIF",
-            "summary": "上传图片并获取现有 EXIF 标签及可编辑状态。",
+            "summary": "上传图片或提供图片链接，获取现有 EXIF 标签及可编辑状态。",
             "request": (
-                "使用 multipart/form-data，字段 `image` 为 JPEG、PNG 或 WebP 文件，"
-                "最大 20 MiB；`key` 是组名与标签名的组合，可直接用于编辑，"
+                "使用 multipart/form-data，图片来源为 `image` 文件或 `image_url` 图片链接"
+                "（二选一），JPEG、PNG 或 WebP，最大 20 MiB；`image_url` 必须是 "
+                "http/https 公开链接，仅支持 80／443 端口，最多跟随 3 次重定向，"
+                "不能指向本机或内网地址。`key` 是组名与标签名的组合，可直接用于编辑，"
                 "只读标签 `writable` 为 false，`reason` 说明原因。"
             ),
             "request_format": "multipart",
             "request_example": (
-                'curl -X POST "$BASE/api/v1/exif/inspect" -F "image=@photo.jpg"'
+                'curl -X POST "$BASE/api/v1/exif/inspect" -F "image=@photo.jpg"\n'
+                'curl -X POST "$BASE/api/v1/exif/inspect" '
+                '-F "image_url=https://example.com/photo.jpg"'
             ),
             "request_language": "bash",
             "response_example": (
@@ -277,9 +282,10 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
             "method": "POST",
             "path": "/exif/edit",
             "name": "编辑并下载",
-            "summary": "上传原图与标签操作，返回修改后的原格式图片。",
+            "summary": "上传原图或提供图片链接与标签操作，返回修改后的原格式图片。",
             "request": (
-                "使用 multipart/form-data：`image` 为原图，`changes` 为 JSON 字符串，"
+                "使用 multipart/form-data：原图为 `image` 文件或 `image_url` 图片链接"
+                "（二选一，链接限制同 inspect），`changes` 为 JSON 字符串，"
                 "包含 1 至 100 项操作；`key` 必须来自可写标签目录，`action` 为 "
                 "set 或 delete，set 必须提供非空 `value`（最多 4096 字符）。"
                 "仅修改 EXIF，不重新编码图片像素，结果作为文件下载。"
@@ -287,6 +293,10 @@ TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
             "request_format": "multipart",
             "request_example": (
                 'curl -X POST "$BASE/api/v1/exif/edit" -F "image=@photo.jpg" '
+                '-F \'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]\' '
+                "-o edited-exif.jpg\n"
+                'curl -X POST "$BASE/api/v1/exif/edit" '
+                '-F "image_url=https://example.com/photo.jpg" '
                 '-F \'changes=[{"key":"IFD0:Make","action":"set","value":"Superbox"}]\' '
                 "-o edited-exif.jpg"
             ),

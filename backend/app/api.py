@@ -23,7 +23,7 @@ from app.schemas import (
     UnixTimestampInput,
     UnixTimestampResult,
 )
-from app import exif, services
+from app import exif, image_source, services
 
 
 router = APIRouter(
@@ -144,9 +144,26 @@ def _image_bytes(image: UploadFile) -> bytes:
     return data
 
 
+def _request_bytes(image: UploadFile | None, image_url: str) -> bytes:
+    link = image_url.strip()
+    if image is not None and image.filename:
+        if link:
+            raise services.ToolInputError("请只提供图片文件或图片链接中的一种")
+        return _image_bytes(image)
+    if not link:
+        raise services.ToolInputError("请选择图片文件或填写图片链接")
+    try:
+        return image_source.fetch_image(link, exif.MAX_IMAGE_BYTES)
+    except image_source.ImageTooLargeError as exc:
+        raise HTTPException(status_code=413, detail="图片不能超过 20 MB") from exc
+
+
 @router.post("/exif/inspect", response_model=ExifInspectResult, tags=["EXIF"])
-def exif_inspect(image: UploadFile = File(...)) -> dict:
-    return exif.inspect(_image_bytes(image))
+def exif_inspect(
+    image: UploadFile | None = File(default=None),
+    image_url: str = Form(default="", max_length=image_source.MAX_URL_LENGTH),
+) -> dict:
+    return exif.inspect(_request_bytes(image, image_url))
 
 
 @router.get("/exif/tags", response_model=ExifCatalogResult, tags=["EXIF"])
@@ -155,12 +172,18 @@ def exif_tags(q: str = Query(default="", max_length=100)) -> dict:
 
 
 @router.post("/exif/edit", tags=["EXIF"], responses={200: {"content": {"image/jpeg": {}, "image/png": {}, "image/webp": {}}}})
-def exif_edit(image: UploadFile = File(...), changes: str = Form(...)) -> Response:
+def exif_edit(
+    changes: str = Form(...),
+    image: UploadFile | None = File(default=None),
+    image_url: str = Form(default="", max_length=image_source.MAX_URL_LENGTH),
+) -> Response:
     try:
         parsed = TypeAdapter(list[ExifChange]).validate_python(json.loads(changes))
     except (ValueError, ValidationError) as exc:
         raise HTTPException(status_code=422, detail="changes 必须是有效的 EXIF 操作数组") from exc
-    output, mime_type, suffix = exif.edit(_image_bytes(image), [item.model_dump() for item in parsed])
+    output, mime_type, suffix = exif.edit(
+        _request_bytes(image, image_url), [item.model_dump() for item in parsed]
+    )
     return Response(
         content=output, media_type=mime_type,
         headers={"Content-Disposition": f'attachment; filename="edited-exif{suffix}"'},

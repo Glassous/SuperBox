@@ -1,17 +1,20 @@
+import http.server
 import io
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+import threading
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image, features
 
-from app import exif
+from app import exif, image_source
 from app.main import app
+from app.services import ToolInputError
 
 
 client = TestClient(app)
@@ -28,6 +31,117 @@ def image_bytes(file_format: str) -> bytes:
 
 def upload(data: bytes, suffix: str = "jpg"):
     return {"image": (f"photo.{suffix}", data, "application/octet-stream")}
+
+
+def serve(payload: bytes) -> http.server.ThreadingHTTPServer:
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            if self.path == "/redirect":
+                self.send_response(302)
+                self.send_header("Location", "/photo")
+                self.end_headers()
+            elif self.path == "/photo":
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, *args):  # noqa: D102
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_image_source_rejects_unsafe_targets():
+    for url in [
+        "",
+        "file:///etc/passwd",
+        "ftp://example.com/photo.jpg",
+        "http://user:secret@example.com/photo.jpg",
+        "http://example.com:8080/photo.jpg",
+        "https:///photo.jpg",
+    ]:
+        with pytest.raises(ToolInputError):
+            image_source.fetch_image(url, exif.MAX_IMAGE_BYTES)
+    for address in [
+        "127.0.0.1", "10.1.2.3", "169.254.10.1", "192.168.1.5",
+        "100.64.0.1", "0.0.0.0", "::1", "fd00::1", "::ffff:127.0.0.1",
+    ]:
+        with pytest.raises(ToolInputError):
+            image_source.public_address(address)
+    assert image_source.public_address("8.8.8.8") == "8.8.8.8"
+    assert image_source.public_address("2606:4700:4700::1111") == "2606:4700:4700::1111"
+
+
+def test_image_source_fetches_redirects_and_limits(monkeypatch):
+    payload = b"\xff\xd8\xff" + b"x" * 4096
+    server = serve(payload)
+    monkeypatch.setattr(image_source, "_resolve", lambda host, port: ["127.0.0.1"])
+    monkeypatch.setattr(image_source, "STANDARD_PORTS", {"http": server.server_port, "https": 443})
+    base = f"http://images.test:{server.server_port}"
+    try:
+        assert image_source.fetch_image(f"{base}/photo", 8192) == payload
+        assert image_source.fetch_image(f"{base}/redirect", 8192) == payload
+        with pytest.raises(image_source.ImageTooLargeError):
+            image_source.fetch_image(f"{base}/photo", 1024)
+        with pytest.raises(ToolInputError):
+            image_source.fetch_image(f"{base}/missing", 8192)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_exif_inspect_accepts_image_url(monkeypatch):
+    captured: list[bytes] = []
+    monkeypatch.setattr(
+        exif, "inspect",
+        lambda data: captured.append(data) or {"format": "JPEG", "tags": []},
+    )
+    link = "https://example.com/photo.jpg"
+    monkeypatch.setattr(image_source, "fetch_image", lambda url, limit: f"remote:{url}".encode())
+
+    ok = client.post(f"{API}/inspect", data={"image_url": link})
+    assert ok.status_code == 200, ok.text
+    assert ok.json() == {"format": "JPEG", "tags": []}
+    assert captured == [f"remote:{link}".encode()]
+
+    both = client.post(f"{API}/inspect", files=upload(image_bytes("JPEG")), data={"image_url": link})
+    assert both.status_code == 400
+    assert "只提供" in both.json()["message"]
+    assert client.post(f"{API}/inspect").status_code == 400
+    assert client.post(f"{API}/inspect", data={"image_url": "   "}).status_code == 400
+
+    def too_large(url, limit):
+        raise image_source.ImageTooLargeError("图片不能超过 20 MB")
+
+    monkeypatch.setattr(image_source, "fetch_image", too_large)
+    oversize = client.post(f"{API}/inspect", data={"image_url": link})
+    assert oversize.status_code == 413
+    assert oversize.json()["code"] == "FILE_TOO_LARGE"
+
+
+def test_exif_edit_accepts_image_url(monkeypatch):
+    captured: list[bytes] = []
+    monkeypatch.setattr(
+        exif, "edit",
+        lambda data, changes: (captured.append(data) or b"edited", "image/jpeg", ".jpg"),
+    )
+    link = "https://example.com/photo.jpg"
+    monkeypatch.setattr(image_source, "fetch_image", lambda url, limit: f"remote:{url}".encode())
+    changes = [{"key": "IFD0:Make", "action": "set", "value": "Superbox"}]
+
+    response = client.post(f"{API}/edit", data={"image_url": link, "changes": json.dumps(changes)})
+    assert response.status_code == 200, response.text
+    assert response.content == b"edited"
+    assert response.headers["content-type"] == "image/jpeg"
+    assert captured == [f"remote:{link}".encode()]
+    assert client.post(f"{API}/edit", data={"changes": json.dumps(changes)}).status_code == 400
 
 
 def test_catalog_distinguishes_groups_and_rejects_unsafe(monkeypatch):

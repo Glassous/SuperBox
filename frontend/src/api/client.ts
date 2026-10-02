@@ -77,9 +77,9 @@ async function multipartRequest(path: string, form: FormData, signal?: AbortSign
   return response
 }
 
-export async function inspectExif(file: File, signal?: AbortSignal): Promise<ExifInspectResult> {
+export async function inspectExif(source: File | string, signal?: AbortSignal): Promise<ExifInspectResult> {
   const form = new FormData()
-  form.append('image', file)
+  form.append(typeof source === 'string' ? 'image_url' : 'image', source)
   return (await multipartRequest('/exif/inspect', form, signal)).json() as Promise<ExifInspectResult>
 }
 
@@ -87,9 +87,9 @@ export function searchExifTags(q = '', signal?: AbortSignal): Promise<{ tags: Ex
   return request(`/exif/tags?q=${encodeURIComponent(q)}`, { signal })
 }
 
-export async function editExif(file: File, changes: ExifChange[]): Promise<Blob> {
+export async function editExif(source: File | string, changes: ExifChange[]): Promise<Blob> {
   const form = new FormData()
-  form.append('image', file)
+  form.append(typeof source === 'string' ? 'image_url' : 'image', source)
   form.append('changes', JSON.stringify(changes))
   return (await multipartRequest('/exif/edit', form)).blob()
 }
