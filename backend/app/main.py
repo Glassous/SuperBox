@@ -7,15 +7,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api import router
 from app.exif import ExifUnavailableError
 from app.services import ToolInputError
+from app.tool_errors import ToolFailure
+from app.documents import DocumentAdmission
 
 
 app = FastAPI(
     title="Superbox API",
     description="工具箱的版本化 HTTP 接口。所有工具计算均在服务端完成。",
-    version="1.0.0",
+    version="1.1.0",
     openapi_url="/api/v1/openapi.json",
 )
 
+app.add_middleware(DocumentAdmission)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +26,12 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+
+
+@app.exception_handler(ToolFailure)
+async def tool_failure(_request: Request, exc: ToolFailure) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"code": exc.code, "message": str(exc)},
+                        headers={"Retry-After": "2"} if exc.status == 429 else None)
 
 
 @app.exception_handler(ExifUnavailableError)

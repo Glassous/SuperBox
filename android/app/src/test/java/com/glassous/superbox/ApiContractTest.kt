@@ -22,6 +22,49 @@ import org.junit.Test
 import java.net.InetSocketAddress
 
 class ApiContractTest {
+    @Test fun newToolsUseExpectedGetJsonAndMultipartContracts() = runBlocking {
+        val requests = mutableListOf<Pair<String, String>>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            val path = exchange.requestURI.path
+            val requestBody = exchange.requestBody.bufferedReader().readText()
+            requests += path to requestBody
+            val reply = when (path) {
+                "/api/v1/time/now" -> """{"iso_datetime":"2026-10-02T12:00:00.000+08:00","timezone":"UTC+08:00","weekday":5,"unix_seconds":"1790913600","unix_milliseconds":"1790913600000"}"""
+                "/api/v1/currency/currencies" -> """{"currencies":[{"code":"CNY","name":"Yuan"},{"code":"USD","name":"Dollar"}]}"""
+                "/api/v1/currency/convert" -> """{"amount":"1","from_currency":"CNY","to_currency":"USD","result":"0.14","rate":"0.14","rate_date":"2026-10-01","source":"Frankfurter","fetched_at":"2026-10-02T04:00:00Z","cached":true,"stale":true}"""
+                else -> """{"result":"中文正文","format":"markdown","filename":"报告.md","warnings":["部分页面无文字"],"stats":{"characters":4}}"""
+            }.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, reply.size.toLong())
+            exchange.responseBody.use { it.write(reply) }
+        }
+        server.start()
+        try {
+            val api = ApiClient("http://127.0.0.1:${server.address.port}")
+            assertEquals(true, api.currentTime().contains("+08:00"))
+            assertEquals(listOf("CNY", "USD"), api.currencies().map { it.code })
+            val converted = api.convertCurrency("1", "CNY", "USD", 2)
+            assertEquals("0.14", converted.result)
+            assertEquals(true, converted.stale)
+            val json = org.json.JSONObject(requests.last().second)
+            assertEquals("1", json.getString("amount")); assertEquals(2, json.getInt("precision"))
+            val uploaded = api.convertDocument("报告.docx", "test".toByteArray(), "", "markdown")
+            assertEquals("报告.md", uploaded.filename); assertEquals("中文正文", uploaded.result)
+            assertEquals(true, requests.last().second.contains("name=\"file\"; filename=\"报告.docx\""))
+            assertEquals(true, requests.last().second.contains("name=\"format\""))
+            api.convertDocument(null, null, "https://example.com/report.pdf", "txt")
+            assertEquals(true, requests.last().second.contains("name=\"file_url\""))
+            assertEquals(false, requests.last().second.contains("filename="))
+        } finally { server.stop(0) }
+    }
+
+    @Test fun documentUploadRejectsOversizeBeforeNetwork() {
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { ApiClient("http://127.0.0.1:1").convertDocument("a.pdf", ByteArray(5 * 1024 * 1024 + 1), "", "txt") }
+        }
+    }
+
     @Test fun baseUrlAddsApiPrefixExactlyOnce() {
         assertEquals(
             "https://superbox.example/api/v1/json/format",
@@ -88,7 +131,7 @@ class ApiContractTest {
             ToolInfo("json", "服务器 JSON", "数据", "在线"),
             ToolInfo("future", "新功能", "其他", "需要新版本"),
         ))
-        assertEquals(listOf("json", "future", "base64", "url", "timestamp", "exif"), result.map { it.info.slug })
+        assertEquals(listOf("json", "future", "base64", "url", "timestamp", "exif", "time", "currency", "documents"), result.map { it.info.slug })
         assertEquals(ToolAvailability.AVAILABLE, result[0].availability)
         assertEquals("服务器 JSON", result[0].info.name)
         assertEquals(ToolAvailability.UPDATE_REQUIRED, result[1].availability)

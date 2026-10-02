@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
@@ -22,8 +23,9 @@ from app.schemas import (
     ToolMetadata,
     UnixTimestampInput,
     UnixTimestampResult,
+    CurrentTimeResult, CurrencyInput, CurrencyCatalogResult, CurrencyResult, DocumentResult,
 )
-from app import exif, image_source, services
+from app import exif, image_source, services, current_time, currency, documents
 
 
 router = APIRouter(
@@ -34,6 +36,36 @@ router = APIRouter(
         422: {"model": ErrorResponse},
     },
 )
+
+
+@router.get("/time/now", response_model=CurrentTimeResult, tags=["Time"])
+def current_datetime(response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return current_time.now()
+
+
+@router.get("/currency/currencies", response_model=CurrencyCatalogResult, tags=["Currency"],
+            responses={503: {"model": ErrorResponse}, 429: {"model": ErrorResponse}})
+async def supported_currencies() -> dict:
+    return await currency.service.currencies()
+
+
+@router.post("/currency/convert", response_model=CurrencyResult, tags=["Currency"],
+             responses={503: {"model": ErrorResponse}, 429: {"model": ErrorResponse}})
+async def convert_currency(body: CurrencyInput) -> dict:
+    return await currency.service.convert(body)
+
+
+@router.post("/documents/convert", response_model=DocumentResult, tags=["Documents"],
+             responses={413: {"model": ErrorResponse}, 429: {"model": ErrorResponse},
+                        503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
+async def convert_document(
+    request: Request,
+    file: UploadFile | None = File(default=None),
+    file_url: str = Form(default="", max_length=2048),
+    format: Literal["markdown", "txt"] = Form(default="markdown"),
+) -> dict:
+    return await documents.convert(file, file_url, format, request)
 
 
 @router.get("/health", response_model=HealthResult, tags=["System"])

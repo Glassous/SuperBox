@@ -8,6 +8,9 @@ import com.glassous.superbox.ui.ExifScreen
 import com.glassous.superbox.ui.JsonScreen
 import com.glassous.superbox.ui.TimestampScreen
 import com.glassous.superbox.ui.UrlScreen
+import com.glassous.superbox.ui.TimeScreen
+import com.glassous.superbox.ui.CurrencyScreen
+import com.glassous.superbox.ui.DocumentsScreen
 
 data class LocalToolDefinition(
     val slug: String,
@@ -40,6 +43,18 @@ object LocalToolRegistry {
             "exif", "tool/exif",
             ToolInfo("exif", "EXIF 编辑", "图片处理", "查看、编辑图片 EXIF 标签并下载原格式图片。", listOf("图片", "照片", "GPS")),
         ) { api, tool, onBack -> ExifScreen(api, tool, onBack) },
+        LocalToolDefinition(
+            "time", "tool/time",
+            ToolInfo("time", "当前时间", "时间日期", "获取服务器当前日期和时间，自动转换为东八区。", listOf("时间", "日期", "东八区")),
+        ) { api, tool, onBack -> TimeScreen(api, tool, onBack) },
+        LocalToolDefinition(
+            "currency", "tool/currency",
+            ToolInfo("currency", "汇率转换", "数据处理", "使用每日参考汇率转换金额并返回汇率日期和来源。", listOf("汇率", "货币", "人民币", "美元")),
+        ) { api, tool, onBack -> CurrencyScreen(api, tool, onBack) },
+        LocalToolDefinition(
+            "documents", "tool/documents",
+            ToolInfo("documents", "文件转换", "文件处理", "将 PDF、DOCX、XLSX 转为 Markdown 或 TXT。", listOf("PDF", "Word", "Excel", "Markdown", "TXT")),
+        ) { api, tool, onBack -> DocumentsScreen(api, tool, onBack) },
     )
 
     private val bySlug = all.associateBy(LocalToolDefinition::slug)

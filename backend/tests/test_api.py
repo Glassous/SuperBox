@@ -13,7 +13,7 @@ def test_catalog_search_and_detail():
     catalog = client.get(f"{API}/tools")
     assert catalog.status_code == 200
     assert {tool["slug"] for tool in catalog.json()["tools"]} == {
-        "json", "base64", "url", "timestamp", "exif"
+        "json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"
     }
     assert [tool["slug"] for tool in client.get(f"{API}/tools?q=编码").json()["tools"]] == [
         "base64", "url"
@@ -137,7 +137,7 @@ def test_wildcard_cors_and_openapi():
 
 def test_every_tool_has_an_interface_document():
     docs = Path(__file__).resolve().parents[2] / "docs"
-    for slug in ["json", "base64", "url", "timestamp", "exif"]:
+    for slug in ["json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"]:
         assert (docs / f"{slug}.md").is_file()
 
 
@@ -174,10 +174,10 @@ def test_skill_json_manifest():
     assert manifest["auth"] == "none"
     assert manifest["version"] == client.get(f"{API}/openapi.json").json()["info"]["version"]
     assert [tool["slug"] for tool in manifest["tools"]] == [
-        "json", "base64", "url", "timestamp", "exif"
+        "json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"
     ]
     endpoints = manifest["endpoints"]
-    assert manifest["endpoints_total"] == len(endpoints) == 16
+    assert manifest["endpoints_total"] == len(endpoints) == 20
     by_path = {endpoint["path"]: endpoint for endpoint in endpoints}
     for endpoint in endpoints:
         assert endpoint["url"] == f"http://testserver/api/v1{endpoint['path']}"
@@ -192,7 +192,8 @@ def test_skill_json_manifest():
         == r'{"text":"{\"name\":\"中文\"}"}'
     )
     assert {error["code"] for error in manifest["errors"]} == {
-        "INVALID_INPUT", "NOT_FOUND", "FILE_TOO_LARGE", "VALIDATION_ERROR", "EXIF_UNAVAILABLE"
+        "INVALID_INPUT", "NOT_FOUND", "FILE_TOO_LARGE", "VALIDATION_ERROR", "EXIF_UNAVAILABLE",
+        "DOCUMENT_LIMIT_EXCEEDED", "TOOL_BUSY", "EXCHANGE_RATE_UNAVAILABLE", "DOCUMENT_UNAVAILABLE", "DOCUMENT_TIMEOUT"
     }
     assert f"{API}/skill.json" in client.get(f"{API}/openapi.json").json()["paths"]
 

@@ -1,6 +1,10 @@
 # Superbox
 
-一个由 FastAPI 提供工具能力、Vue 负责展示的开发工具箱。提供 JSON、Base64、URL 参数值、时间戳和图片 EXIF 编辑工具。所有搜索、校验与转换均通过后端 API 完成。
+一个由 FastAPI 提供工具能力、Vue 与 Android 负责展示的开发工具箱。提供 JSON、Base64、URL 参数值、时间戳、图片 EXIF、东八区当前时间、每日参考汇率和 PDF/DOCX/XLSX 转 Markdown/TXT 工具。所有搜索、校验与转换均通过后端 API 完成。
+
+新增 API：`GET /api/v1/time/now`、`GET /api/v1/currency/currencies`、`POST /api/v1/currency/convert`、`POST /api/v1/documents/convert`。官方 Skill 版本为 1.1.0，网页 `/api-access` 提供完整说明、在线测试和调用示例。
+
+文件转换按需启动受限子进程：最大文件 5 MiB、并发 1、256 MiB 内存、10 秒 CPU、15 秒解析时间；支持 Linux 和 Windows，不执行 OCR 或公式。Compose 采用单 API worker，容器内存和 swap 总上限均为 512 MiB。汇率由服务器请求 Frankfurter 最新可用每日参考数据，不需要 API Key。细节见 [文件转换](docs/documents.md) 和 [汇率转换](docs/currency.md)。
 
 ## 本地开发
 

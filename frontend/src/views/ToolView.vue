@@ -7,6 +7,9 @@ import ToolMark from '../components/ToolMark.vue'
 import type { ToolInfo } from '../types'
 
 const forms = {
+  time: defineAsyncComponent(() => import('../tools/TimeTool.vue')),
+  currency: defineAsyncComponent(() => import('../tools/CurrencyTool.vue')),
+  documents: defineAsyncComponent(() => import('../tools/DocumentsTool.vue')),
   json: defineAsyncComponent(() => import('../tools/JsonTool.vue')),
   base64: defineAsyncComponent(() => import('../tools/Base64Tool.vue')),
   url: defineAsyncComponent(() => import('../tools/UrlTool.vue')),

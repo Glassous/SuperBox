@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import ApiTryForm from './ApiTryForm.vue'
 import { apiBaseUrl } from '../api/client'
-import { makeAiPrompt, type ApiToolDoc } from '../data/apiDocs'
+import { apiExampleBody, makeAiPrompt, type ApiToolDoc } from '../data/apiDocs'
 
 const props = defineProps<{ doc: ApiToolDoc }>()
 const selectedOperationId = ref(props.doc.operations[0]?.id ?? '')
@@ -14,9 +14,19 @@ const endpointUrl = computed(() => currentOperation.value ? `${apiBaseUrl}/api/v
 const fetchExample = computed(() => {
   if (!currentOperation.value) return ''
   const operation = currentOperation.value
-  if (operation.method === 'GET') return `const response = await fetch('${endpointUrl.value}?q=DateTimeOriginal');\nconst data = await response.json();`
-  if (operation.multipart) return `const form = new FormData();\nform.append('image', imageFile); // 也可用 form.append('image_url', 'https://example.com/photo.jpg');${operation.binaryResponse ? "\nform.append('changes', JSON.stringify([{ key: 'IFD0:Make', action: 'set', value: 'Superbox' }]));" : ''}\nconst response = await fetch('${endpointUrl.value}', { method: 'POST', body: form });\n${operation.binaryResponse ? 'const image = await response.blob();' : 'const data = await response.json();'}`
-  const body = JSON.stringify(currentOperation.value.exampleBody, null, 2).replace(/\n/g, '\n  ')
+  if (operation.method === 'GET') {
+    const query = new URLSearchParams(operation.exampleBody).toString()
+    return `const response = await fetch('${endpointUrl.value}${query ? '?' + query : ''}');\nconst data = await response.json();`
+  }
+  if (operation.multipart) {
+    const fields = operation.fields.map(field => field.type === 'file'
+      ? `form.append('${field.name}', selectedFile); // 上传文件或改用下面的公开链接，二选一`
+      : field.type === 'url' ? `// form.append('${field.name}', 'https://example.com/file');`
+      : `form.append('${field.name}', ${JSON.stringify(operation.exampleBody[field.name] ?? '')});`).join('\n')
+    return `const form = new FormData();\n${fields}\nconst response = await fetch('${endpointUrl.value}', { method: 'POST', body: form });\n${operation.binaryResponse ? 'const file = await response.blob();' : 'const data = await response.json();'}`
+  }
+  const example = Object.fromEntries(operation.fields.map(field => [field.name, field.type === 'integer' ? Number(operation.exampleBody[field.name]) : operation.exampleBody[field.name]]))
+  const body = JSON.stringify(example, null, 2).replace(/\n/g, '\n  ')
   return `const response = await fetch('${endpointUrl.value}', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(${body}),\n});\nconst data = await response.json();`
 })
 
@@ -70,7 +80,7 @@ async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
               <div class="grid gap-4 xl:grid-cols-2">
                 <section class="min-w-0 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
                   <div class="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">请求示例</div>
-                  <pre class="max-h-40 overflow-auto p-4 font-mono text-xs leading-5 text-slate-700 dark:text-slate-200">{{ JSON.stringify(currentOperation.exampleBody, null, 2) }}</pre>
+                  <pre class="max-h-40 overflow-auto p-4 font-mono text-xs leading-5 text-slate-700 dark:text-slate-200">{{ JSON.stringify(apiExampleBody(currentOperation), null, 2) }}</pre>
                 </section>
                 <section class="min-w-0 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
                   <div class="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">成功响应示例</div>
@@ -90,7 +100,7 @@ async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
                 <pre class="mt-4 max-h-44 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-6 text-slate-600 dark:text-slate-300">{{ aiPrompt }}</pre>
               </section>
 
-              <p class="pb-1 text-xs leading-5 text-slate-400">错误响应：无效内容返回 HTTP 400 / INVALID_INPUT；字段无效返回 HTTP 422 / VALIDATION_ERROR。图片超出 20 MB 返回 HTTP 413 / FILE_TOO_LARGE，ExifTool 不可用返回 HTTP 503 / EXIF_UNAVAILABLE。</p>
+              <p class="pb-1 text-xs leading-5 text-slate-400">错误响应：400 / INVALID_INPUT；422 / VALIDATION_ERROR；上传超限 413 / FILE_TOO_LARGE；文档容量超限 413 / DOCUMENT_LIMIT_EXCEEDED；繁忙 429 / TOOL_BUSY；汇率不可用 503 / EXCHANGE_RATE_UNAVAILABLE；文档处理不可用 503 / DOCUMENT_UNAVAILABLE；文档超时 504 / DOCUMENT_TIMEOUT；ExifTool 不可用 503 / EXIF_UNAVAILABLE。</p>
             </div>
         </div>
 </template>

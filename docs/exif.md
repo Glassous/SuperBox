@@ -38,6 +38,8 @@ curl -X POST "http://localhost:8087/api/v1/exif/edit" \
   -o edited-exif.jpg
 ```
 
+`changes` 示例：
+
 ```json
 [
   {"key":"IFD0:Make","action":"set","value":"Superbox"},

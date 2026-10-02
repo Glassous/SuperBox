@@ -1,6 +1,6 @@
 # Superbox API 文档
 
-基础地址：`http://localhost:8087/api/v1`。文本工具使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。图片 EXIF 工具使用 multipart 上传图片文件或图片链接，编辑结果为二进制图片。所有工具运算和搜索均由后端执行。
+基础地址：`http://localhost:8087/api/v1`。现有文本转换工具使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。当前时间通过 GET 获取；汇率转换使用十进制字符串金额和 JSON 请求。图片 EXIF 与文件转换使用 multipart 上传文件或公开文件链接，EXIF 编辑返回二进制图片，文件转换返回包含 Markdown/TXT 文本的 JSON。各工具的限制见对应文档。所有工具运算和搜索均由后端执行。
 
 面向接入方的页面位于前端路由 `/api-access`，提供 AI 平台 Skill 接口（官方 Skill 与 JSON 清单，可复制地址）以及按工具划分的接口说明、在线测试与 AI 接入提示词。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
 
@@ -11,6 +11,9 @@
 | URL 参数值编解码 | [url.md](url.md) |
 | 时间戳转换 | [timestamp.md](timestamp.md) |
 | 图片 EXIF 编辑与下载 | [exif.md](exif.md) |
+| 东八区当前时间 | [time.md](time.md) |
+| 每日参考汇率转换 | [currency.md](currency.md) |
+| PDF/DOCX/XLSX 转 Markdown/TXT | [documents.md](documents.md) |
 
 ## 公共接口
 

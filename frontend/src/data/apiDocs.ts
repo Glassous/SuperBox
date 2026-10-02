@@ -5,6 +5,7 @@ export interface ApiField {
   description: string
   options?: { value: string; label: string }[]
   multiline?: boolean
+  accept?: string
 }
 
 export interface ApiOperation {
@@ -19,6 +20,7 @@ export interface ApiOperation {
   method?: 'GET' | 'POST'
   multipart?: boolean
   binaryResponse?: boolean
+  downloadName?: string
 }
 
 export interface ApiToolDoc {
@@ -39,6 +41,36 @@ const textField: ApiField = {
 
 export const apiDocs: ApiToolDoc[] = [
   {
+    slug: 'time', name: '当前时间', category: '时间日期', description: '获取服务器当前日期和时间，固定显示东八区。',
+    operations: [{ id: 'now', name: '获取当前时间', summary: '返回同一时间点的日期、时间、星期和时间戳，禁止缓存。', path: '/time/now', method: 'GET', fields: [], exampleBody: {},
+      exampleResponse: { date: '2026-10-02', time: '12:00:00.000', iso_datetime: '2026-10-02T12:00:00.000+08:00', timezone: 'UTC+08:00', weekday: 5, unix_seconds: '1790913600', unix_milliseconds: '1790913600000' } }],
+  },
+  {
+    slug: 'currency', name: '汇率转换', category: '数据处理', description: '使用每日参考汇率兑换货币金额，并保留汇率日期和来源。',
+    operations: [
+      { id: 'currencies', name: '货币目录', summary: '获取支持的货币代码和名称。', path: '/currency/currencies', method: 'GET', fields: [], exampleBody: {}, exampleResponse: { currencies: [{ code: 'CNY', name: 'Chinese Renminbi Yuan' }, { code: 'USD', name: 'United States Dollar' }] } },
+      { id: 'convert', name: '兑换金额', summary: '使用 Frankfurter 最新可用每日参考汇率进行兑换。', path: '/currency/convert', fields: [
+        { name: 'amount', label: '金额', type: 'string', description: '非负十进制字符串，最多 15 位整数、8 位小数。' },
+        { name: 'from_currency', label: '原币种', type: 'string', description: '货币目录中的三位货币代码。' },
+        { name: 'to_currency', label: '目标币种', type: 'string', description: '货币目录中的三位货币代码。' },
+        { name: 'precision', label: '小数位数', type: 'integer', description: '0–8，默认 2。', options: Array.from({ length: 9 }, (_, n) => ({ value: String(n), label: String(n) })) },
+      ], exampleBody: { amount: '100', from_currency: 'CNY', to_currency: 'USD', precision: '2' },
+      exampleResponse: { amount: '100', from_currency: 'CNY', to_currency: 'USD', precision: 2, result: '14.00', rate: '0.14', rate_date: '2026-10-02', source: 'Frankfurter', fetched_at: '2026-10-02T04:00:00+00:00', cached: false, stale: false },
+      note: '参考汇率每日更新；必须保留汇率日期。缓存 1 小时，上游失败仅使用获取时间不超过 24 小时的缓存（stale=true）。无有效缓存返回 503 / EXCHANGE_RATE_UNAVAILABLE。同币种汇率 1，日期为 null。' },
+    ],
+  },
+  {
+    slug: 'documents', name: '文件转换', category: '文件处理', description: 'PDF、DOCX、XLSX 的文字和表格转 Markdown/TXT。',
+    operations: [{ id: 'convert', name: '转换文件', summary: '上传文档或提供公开链接，返回转换后的文本与警告。', path: '/documents/convert', multipart: true,
+      fields: [
+        { name: 'file', label: '文件', type: 'file', accept: '.pdf,.docx,.xlsx', description: '与 file_url 二选一，最大 5 MiB。' },
+        { name: 'file_url', label: '公开文件链接', type: 'url', description: '与 file 二选一，最多 2048 字符，仅公开 HTTP/HTTPS 地址。' },
+        { name: 'format', label: '输出格式', type: 'string', description: 'markdown（默认）或 txt。', options: [{ value: 'markdown', label: 'Markdown' }, { value: 'txt', label: 'TXT' }] },
+      ], exampleBody: { file_url: '', format: 'markdown' },
+      exampleResponse: { result: '## 第 1 页\n\n示例正文', format: 'markdown', filename: 'document.md', source_type: 'pdf', stats: { pages: 1, worksheets: 0, cells: 0, characters: 14 }, warnings: [] },
+      note: '返回 JSON 文本，客户端自行保存文件。最多 100 页 PDF、20 工作表、累计 50,000 单元格、500,000 字符；Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1，内存 256 MiB、CPU 10 秒、解析 15 秒。不支持 OCR、DOC/XLS、宏、加密或复杂排版；不执行公式。超限报错，不截断。' }],
+  },
+  {
     slug: 'exif',
     name: 'EXIF 编辑',
     category: '图片处理',
@@ -48,7 +80,7 @@ export const apiDocs: ApiToolDoc[] = [
         id: 'inspect', name: '读取 EXIF', summary: '上传图片或提供图片链接，获取现有标签及可编辑状态。',
         path: '/exif/inspect', multipart: true,
         fields: [
-          { name: 'image', label: '图片文件', type: 'file', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
+          { name: 'image', label: '图片文件', type: 'file', accept: '.jpg,.jpeg,.png,.webp', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
           { name: 'image_url', label: '图片链接', type: 'url', description: '与 image 二选一，http/https 公开链接，最大 20 MB。' },
         ],
         exampleBody: { image: '<选择图片文件>', image_url: 'https://example.com/photo.jpg' },
@@ -65,7 +97,7 @@ export const apiDocs: ApiToolDoc[] = [
         id: 'edit', name: '编辑并下载', summary: '上传原图或提供图片链接和标签操作，返回修改后的原格式图片。',
         path: '/exif/edit', multipart: true, binaryResponse: true,
         fields: [
-          { name: 'image', label: '图片文件', type: 'file', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
+          { name: 'image', label: '图片文件', type: 'file', accept: '.jpg,.jpeg,.png,.webp', description: '与 image_url 二选一，JPEG、PNG 或 WebP，最大 20 MB。' },
           { name: 'image_url', label: '图片链接', type: 'url', description: '与 image 二选一，http/https 公开链接，最大 20 MB。' },
           { name: 'changes', label: '标签操作', type: 'JSON string', description: '必填，1 至 100 项；每项包含 key、action（set/delete），set 时包含 value。', multiline: true },
         ],
@@ -200,7 +232,16 @@ export const apiDocs: ApiToolDoc[] = [
   },
 ]
 
+export function apiExampleBody(operation: ApiOperation): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(operation.exampleBody).map(([key, value]) => [key,
+    operation.fields.find(field => field.name === key)?.type === 'integer' ? Number(value) : value]))
+}
+
 export function makeAiPrompt(doc: ApiToolDoc, baseUrl: string): string {
-  const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operation.path}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(operation.exampleBody)}；成功响应示例 ${JSON.stringify(operation.exampleResponse)}`).join('\n')
-  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${doc.slug === 'exif' ? '图片接口使用 multipart/form-data：图片通过 image 文件或 image_url 图片链接二选一提供；编辑接口返回二进制图片，须保存为文件。' : '请求和响应均为 JSON；请求头使用 Content-Type: application/json。'}当前接口不需要认证。\n${endpoints}\n\n请为每个接口补齐请求与响应类型、调用函数、加载与错误状态，并给出一个最小使用示例和必要的测试。HTTP 400 表示 INVALID_INPUT，HTTP 422 表示 VALIDATION_ERROR；API 地址请放在环境配置中，不要写死在业务组件里。如果我还没有提供项目技术栈或目标页面，先向我确认。`
+  const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operation.path}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(apiExampleBody(operation))}；成功响应示例 ${JSON.stringify(operation.exampleResponse)}`).join('\n')
+  const transport = doc.operations.some(operation => operation.multipart)
+    ? '文件接口使用 multipart/form-data，文件与公开链接二选一；不要手工设置 multipart 的 Content-Type，让客户端生成 boundary。只有标记为 binaryResponse 的接口返回二进制，其余返回 JSON。'
+    : 'GET 无请求体；POST 使用 JSON，Content-Type: application/json。各字段类型以接口文档为准。'
+  const notes = doc.operations.map(operation => operation.note).filter(Boolean).join('\n')
+  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${transport} 当前接口不需要认证。\n${endpoints}\n${notes}\n\n请补齐请求与响应类型、调用函数、加载与错误状态。HTTP 400 / INVALID_INPUT，422 / VALIDATION_ERROR，413 表示容量超限，429 / TOOL_BUSY，503 表示服务不可用，504 / DOCUMENT_TIMEOUT；依据 HTTP 状态和 code 处理，不解析中文提示。API 地址放在环境配置中。文件转换结果的 result 为 UTF-8 文本，可保存为 filename。金额精度运算全部交给服务器。如果我还没有提供项目技术栈或目标页面，先向我确认。`
 }

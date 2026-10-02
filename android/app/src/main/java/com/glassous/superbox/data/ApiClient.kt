@@ -33,6 +33,18 @@ data class ExifCatalogTag(val key: String, val name: String, val writable: Boole
 data class ExifInspection(val format: String, val tags: List<ExifTag>)
 data class ExifChange(val key: String, val action: String, val value: String = "")
 
+data class CurrencyInfo(val code: String, val name: String)
+data class CurrencyConversion(
+    val amount: String, val from: String, val to: String, val result: String,
+    val rate: String, val rateDate: String?, val source: String, val fetchedAt: String?,
+    val cached: Boolean, val stale: Boolean,
+) {
+    fun display(): String = "$amount $from = $result $to\n汇率：$rate\n汇率日期：${rateDate ?: "同币种，无需汇率"}\n来源：$source\n" +
+        (if (stale) "供应商暂不可用，使用获取时间不超过 24 小时的缓存" else if (cached) "使用缓存汇率" else "最新获取") +
+        (fetchedAt?.let { "\n获取时间：$it" } ?: "")
+}
+data class DocumentConversion(val result: String, val format: String, val filename: String, val warnings: List<String>, val characters: Int)
+
 class ApiException(message: String, val status: Int? = null, val code: String? = null) : Exception(message)
 
 fun apiPath(baseUrl: String, path: String): String =
@@ -118,6 +130,43 @@ class ApiClient(private val baseUrl: String) {
 
     suspend fun textOperation(path: String, text: String): String =
         json(path, "POST", JSONObject().put("text", text)).getString("result")
+
+    suspend fun currentTime(): String = json("time/now").let {
+        listOf("获取时间：${it.getString("iso_datetime")}", "时区：东八区（${it.getString("timezone")}）",
+            "星期：${it.getInt("weekday")}", "Unix 秒：${it.getString("unix_seconds")}",
+            "Unix 毫秒：${it.getString("unix_milliseconds")}").joinToString("\n")
+    }
+
+    suspend fun currencies(): List<CurrencyInfo> = json("currency/currencies").getJSONArray("currencies").mapObjects {
+        CurrencyInfo(it.getString("code"), it.getString("name"))
+    }
+
+    suspend fun convertCurrency(amount: String, from: String, to: String, precision: Int): CurrencyConversion =
+        json("currency/convert", "POST", JSONObject().put("amount", amount).put("from_currency", from)
+            .put("to_currency", to).put("precision", precision)).let {
+            CurrencyConversion(it.getString("amount"), it.getString("from_currency"), it.getString("to_currency"),
+                it.getString("result"), it.getString("rate"), if (it.isNull("rate_date")) null else it.getString("rate_date"),
+                it.getString("source"), if (it.isNull("fetched_at")) null else it.getString("fetched_at"), it.getBoolean("cached"), it.getBoolean("stale"))
+        }
+
+    suspend fun convertDocument(filename: String?, file: ByteArray?, fileUrl: String, format: String): DocumentConversion {
+        require((file != null) != fileUrl.isNotBlank()) { "请只提供文件或公开文件链接中的一种" }
+        require(file == null || file.size <= 5 * 1024 * 1024) { "文件不能超过 5 MiB" }
+        val boundary = "superbox-${UUID.randomUUID()}"
+        val body = java.io.ByteArrayOutputStream()
+        fun write(value: String) = body.write(value.toByteArray(StandardCharsets.UTF_8))
+        if (file != null) {
+            val safeName = (filename ?: "document").replace(Regex("[\\r\\n\"]"), "_")
+            write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$safeName\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+            body.write(file); write("\r\n")
+        } else {
+            write("--$boundary\r\nContent-Disposition: form-data; name=\"file_url\"\r\n\r\n$fileUrl\r\n")
+        }
+        write("--$boundary\r\nContent-Disposition: form-data; name=\"format\"\r\n\r\n$format\r\n--$boundary--\r\n")
+        val response = JSONObject(String(request("documents/convert", "POST", "multipart/form-data; boundary=$boundary", body.toByteArray()), StandardCharsets.UTF_8))
+        return DocumentConversion(response.getString("result"), response.getString("format"), response.getString("filename"),
+            response.getJSONArray("warnings").mapStrings(), response.getJSONObject("stats").getInt("characters"))
+    }
 
     suspend fun validateJson(text: String): Pair<Boolean, String> =
         json("json/validate", "POST", JSONObject().put("text", text)).let {

@@ -21,16 +21,19 @@ class ErrorContractEntry(TypedDict):
     meaning: str
 
 
-SKILL_VERSION = "1.0.0"
+SKILL_VERSION = "1.1.0"
 
 SKILL_DESCRIPTION = (
     "Superbox 是由 FastAPI 提供工具能力的开发工具箱：JSON 格式化与校验、"
     "Base64 编解码、URL 参数值编解码、Unix 时间戳转换，以及图片 EXIF 读取与编辑。"
+    "新增东八区当前时间、每日参考汇率转换和 PDF/DOCX/XLSX 转 Markdown/TXT。"
     "所有计算均由服务端完成。本 Skill 由官方维护，覆盖当前全部对外接口，"
     "任何 AI 平台或智能体都可以直接按本文档调用，无需认证。"
 )
 
 CONVENTIONS = [
+    "当前时间固定返回 UTC+08:00；既有时间戳转换接口仍返回 UTC。汇率是每日参考值，必须保留 rate_date、source 和 stale 信息。",
+    "文件转换使用 multipart/form-data：file 或 file_url 二选一，format 为 markdown（默认）或 txt；结果为 JSON 文本，客户端自行保存为文件。最大 5 MiB，不支持 OCR、DOC/XLS、宏或加密文件。",
     "文本工具（JSON、Base64、URL、时间戳）使用 JSON 请求与响应：请求头 "
     "`Content-Type: application/json`，字符串输入长度为 1 至 1,000,000 个字符。",
     "图片 EXIF 工具使用 `multipart/form-data`，图片来源为 `image` 文件或 `image_url` 图片链接"
@@ -52,9 +55,14 @@ ERROR_CONTRACT: list[ErrorContractEntry] = [
         "meaning": "内容无法完成对应操作，例如 JSON 语法错误、无效 Base64、时间戳非整数或超出支持范围",
     },
     {"status": 404, "code": "NOT_FOUND", "meaning": "未知接口或工具"},
-    {"status": 413, "code": "FILE_TOO_LARGE", "meaning": "图片超过 20 MiB"},
+    {"status": 413, "code": "FILE_TOO_LARGE", "meaning": "图片超过 20 MiB，文档超过 5 MiB 或转换请求体超过 6 MiB"},
     {"status": 422, "code": "VALIDATION_ERROR", "meaning": "字段缺失、类型错误或超出长度限制"},
     {"status": 503, "code": "EXIF_UNAVAILABLE", "meaning": "服务端 ExifTool 不可用"},
+    {"status": 413, "code": "DOCUMENT_LIMIT_EXCEEDED", "meaning": "文档解压、页数、单元格、文本或内存超过限制"},
+    {"status": 429, "code": "TOOL_BUSY", "meaning": "工具繁忙，稍后重试；文件转换同时仅处理一项"},
+    {"status": 503, "code": "EXCHANGE_RATE_UNAVAILABLE", "meaning": "汇率供应商不可用且没有有效缓存"},
+    {"status": 503, "code": "DOCUMENT_UNAVAILABLE", "meaning": "无法建立文件转换资源限制或处理进程不可用"},
+    {"status": 504, "code": "DOCUMENT_TIMEOUT", "meaning": "文档解析超过 15 秒或 10 秒 CPU 时间"},
 ]
 
 AI_GUIDANCE = [
@@ -97,7 +105,7 @@ PUBLIC_ENDPOINTS: list[Endpoint] = [
         "path": "/tools/{slug}",
         "name": "工具详情",
         "summary": "按 slug 返回单个工具的元数据；未知 slug 返回 404。",
-        "request": "路径参数 `slug` 取值：json、base64、url、timestamp、exif。",
+        "request": "路径参数 `slug` 取值：json、base64、url、timestamp、exif、time、currency、documents。",
         "request_format": "path",
         "request_example": "GET $BASE/api/v1/tools/json",
         "request_language": "http",
@@ -121,6 +129,32 @@ PUBLIC_ENDPOINTS: list[Endpoint] = [
 
 
 TOOL_ENDPOINTS: dict[str, list[Endpoint]] = {
+    "time": [{
+        "method": "GET", "path": "/time/now", "name": "获取东八区当前时间",
+        "summary": "读取服务器当前时间并固定转换为 UTC+08:00，响应禁止缓存。",
+        "request": "无参数。", "request_format": "none",
+        "response_example": '{"date":"2026-10-02","time":"12:00:00.000","iso_datetime":"2026-10-02T12:00:00.000+08:00","timezone":"UTC+08:00","weekday":5,"unix_seconds":"1790913600","unix_milliseconds":"1790913600000"}',
+    }],
+    "currency": [
+        {"method": "GET", "path": "/currency/currencies", "name": "货币目录",
+         "summary": "获取 Frankfurter 支持的当前货币代码和名称，目录缓存 24 小时。",
+         "request": "无参数。", "request_format": "none",
+         "response_example": '{"currencies":[{"code":"CNY","name":"Chinese Renminbi Yuan"},{"code":"USD","name":"United States Dollar"}]}'},
+        {"method": "POST", "path": "/currency/convert", "name": "汇率转换",
+         "summary": "使用最新可用每日参考汇率兑换金额，并返回来源和汇率日期。",
+         "request": "JSON：amount 为非负十进制字符串（最多 15 位整数、8 位小数），from_currency/to_currency 为目录中的三位代码；precision 默认 2，范围 0–8。汇率缓存 1 小时，上游失败仅允许获取时间不超过 24 小时的缓存，stale=true。同币种汇率 1，rate_date/fetched_at=null，source=identity。",
+         "request_example": '{"amount":"100","from_currency":"CNY","to_currency":"USD","precision":2}',
+         "response_example": '{"amount":"100","from_currency":"CNY","to_currency":"USD","precision":2,"result":"14.00","rate":"0.14","rate_date":"2026-10-02","source":"Frankfurter","fetched_at":"2026-10-02T04:00:00+00:00","cached":false,"stale":false}'},
+    ],
+    "documents": [{
+        "method": "POST", "path": "/documents/convert", "name": "文档转 Markdown/TXT",
+        "summary": "按需在受限子进程中提取 PDF、DOCX、XLSX 的文字与表格。",
+        "request_format": "multipart",
+        "request": "multipart：file 上传或 file_url 公开 HTTP/HTTPS 链接二选一，format=markdown（默认）或 txt。最大 5 MiB、100 页 PDF、20 个工作表及累计 50,000 单元格、500,000 输出字符。Office ZIP 最多 2,000 条目和 50 MiB 解压大小。并发 1；子进程最多 256 MiB 内存、10 秒 CPU、15 秒总解析时间。超限报错，不截断。无 OCR、不支持 DOC/XLS、宏或加密文件；公式仅返回缓存结果，缺失时输出空值并警告。结果是 JSON，不是二进制下载。",
+        "request_example": 'curl -X POST "$BASE/api/v1/documents/convert" -F "file=@report.pdf" -F "format=markdown"',
+        "request_language": "bash",
+        "response_example": '{"result":"## 第 1 页\\n\\n示例正文","format":"markdown","filename":"report.md","source_type":"pdf","stats":{"pages":1,"worksheets":0,"cells":0,"characters":14},"warnings":[]}',
+    }],
     "json": [
         {
             "method": "POST",

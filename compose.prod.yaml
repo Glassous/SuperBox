@@ -4,6 +4,8 @@ services:
     ports:
       - "8087:8087"
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
     healthcheck:
       test:
         - CMD

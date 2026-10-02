@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { ApiError, editExif, inspectExif, postTool, searchExifTags } from '../api/client'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { ApiError, executeOperation, saveBlob } from '../api/client'
 import type { ApiOperation } from '../data/apiDocs'
 
 const props = defineProps<{ operation: ApiOperation }>()
@@ -11,9 +11,12 @@ const error = ref('')
 const loading = ref(false)
 const selectedFile = ref<File | null>(null)
 let requestId = 0
+let controller: AbortController | undefined
+onBeforeUnmount(() => { requestId++; controller?.abort() })
 
 watch(() => props.operation, operation => {
   requestId++
+  controller?.abort()
   values.value = { ...operation.exampleBody }
   responseText.value = ''
   status.value = null
@@ -29,32 +32,20 @@ async function sendRequest() {
   error.value = ''
   status.value = null
   try {
-    const linkField = props.operation.fields.find(field => field.type === 'url')
-    const link = linkField ? (values.value[linkField.name] ?? '').trim() : ''
-    if (props.operation.multipart && !selectedFile.value && !link) throw new Error('请先选择图片文件或填写图片链接。')
-    const source = selectedFile.value ?? link
-    if (props.operation.binaryResponse) {
-      const blob = await editExif(source, JSON.parse(values.value.changes || '[]') as { key: string; action: 'set' | 'delete'; value?: string }[])
-      if (current !== requestId) return
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `edited-exif.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`
-      anchor.click()
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      responseText.value = `图片已下载（${blob.size} 字节，${blob.type}）`
+    controller?.abort()
+    controller = new AbortController()
+    const response = await executeOperation(props.operation, values.value, selectedFile.value, controller.signal)
+    if (current !== requestId) return
+    if (response instanceof Blob) {
+      saveBlob(response, props.operation.downloadName ?? `edited-exif.${response.type.split('/')[1] === 'jpeg' ? 'jpg' : response.type.split('/')[1]}`)
+      responseText.value = `文件已下载（${response.size} 字节，${response.type}）`
       status.value = 200
       return
     }
-    const response = props.operation.path === '/exif/inspect'
-      ? await inspectExif(source)
-      : props.operation.path === '/exif/tags'
-        ? await searchExifTags(values.value.q)
-        : await postTool<Record<string, unknown>>(props.operation.path, values.value)
-    if (current !== requestId) return
     responseText.value = JSON.stringify(response, null, 2)
     status.value = 200
   } catch (cause) {
+    if (current !== requestId) return
     if (current !== requestId) return
     if (cause instanceof ApiError) {
       error.value = cause.message
@@ -84,7 +75,7 @@ async function sendRequest() {
         <select v-if="field.options" v-model="values[field.name]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white">
           <option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
-        <input v-else-if="field.type === 'file'" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="mt-2 block w-full text-sm" @change="selectedFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+        <input v-else-if="field.type === 'file'" type="file" :accept="field.accept" class="mt-2 block w-full text-sm" @change="selectedFile = ($event.target as HTMLInputElement).files?.[0] ?? null" />
         <textarea v-else-if="field.multiline" v-model="values[field.name]" spellcheck="false" rows="3" class="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white"></textarea>
         <input v-else v-model="values[field.name]" type="text" spellcheck="false" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white" />
       </label>

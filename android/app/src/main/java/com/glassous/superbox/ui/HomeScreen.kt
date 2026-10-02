@@ -539,6 +539,9 @@ private fun ToolMark(slug: String, modifier: Modifier = Modifier) {
         "url" -> Triple("↗", Color(0xFF0284C7), Color(0xFFE0F2FE))
         "timestamp" -> Triple("◷", Color(0xFFD97706), Color(0xFFFEF3C7))
         "exif" -> Triple("◎", Color(0xFF047857), Color(0xFFD1FAE5))
+        "time" -> Triple("◴", Color(0xFFD97706), Color(0xFFFEF3C7))
+        "currency" -> Triple("¤", Color(0xFF047857), Color(0xFFD1FAE5))
+        "documents" -> Triple("≡", Color(0xFF4F46E5), Color(0xFFE0E7FF))
         else -> Triple("✦", Color(0xFF4F46E5), Color(0xFFE0E7FF))
     }
     Surface(

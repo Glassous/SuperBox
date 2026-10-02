@@ -42,6 +42,28 @@ def fetch_image(url: str, max_bytes: int) -> bytes:
     raise ToolInputError("图片链接重定向次数过多")
 
 
+def fetch_file(url: str, max_bytes: int) -> bytes:
+    """Use the same pinned DNS/public-IP checks for document downloads."""
+    target = url.strip()
+    try:
+        for _ in range(MAX_REDIRECTS + 1):
+            parts = _parse(target)
+            status, location, data = _download(parts, max_bytes, "application/pdf,application/octet-stream,*/*")
+            if status in REDIRECT_STATUSES:
+                if not location:
+                    raise ToolInputError("文件链接重定向缺少目标地址")
+                target = urljoin(target, location)
+                continue
+            if status != 200:
+                raise ToolInputError(f"文件链接返回 HTTP {status}")
+            return data
+        raise ToolInputError("文件链接重定向次数过多")
+    except ImageTooLargeError:
+        raise
+    except ToolInputError as exc:
+        raise ToolInputError(str(exc).replace("图片", "文件")) from exc
+
+
 def _parse(url: str) -> SplitResult:
     if not url or len(url) > MAX_URL_LENGTH:
         raise ToolInputError("图片链接不能为空且不能超过 2048 字符")
@@ -133,7 +155,7 @@ def _read_body(response: http.client.HTTPResponse, max_bytes: int) -> bytes:
         chunks.append(chunk)
 
 
-def _download(parts: SplitResult, max_bytes: int) -> tuple[int, str, bytes]:
+def _download(parts: SplitResult, max_bytes: int, accept: str = "image/*,*/*;q=0.8") -> tuple[int, str, bytes]:
     host = parts.hostname or ""
     port = _port(parts)
     addresses = _resolve(host, port)
@@ -147,7 +169,7 @@ def _download(parts: SplitResult, max_bytes: int) -> tuple[int, str, bytes]:
         try:
             connection.request(
                 "GET", _path(parts),
-                headers={"User-Agent": USER_AGENT, "Accept": "image/*,*/*;q=0.8"},
+                headers={"User-Agent": USER_AGENT, "Accept": accept},
             )
             response = connection.getresponse()
             if response.status in REDIRECT_STATUSES:
