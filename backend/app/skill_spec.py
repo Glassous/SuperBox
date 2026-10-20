@@ -21,15 +21,28 @@ class ErrorContractEntry(TypedDict):
     meaning: str
 
 
-SKILL_VERSION = "1.3.0"
+SKILL_VERSION = "1.4.0"
 
 SKILL_DESCRIPTION = (
     "Superbox 是由 FastAPI 提供工具能力的开发工具箱：JSON 格式化与校验、"
     "Base64 编解码、URL 参数值编解码、Unix 时间戳转换，以及图片 EXIF 读取与编辑。"
-    "新增东八区当前时间、每日参考汇率转换和 PDF/DOCX/XLSX 转 Markdown/TXT。"
-    "所有计算均由服务端完成。本 Skill 由官方维护，覆盖当前全部对外接口，"
-    "任何 AI 平台或智能体都可以直接按本文档调用，无需认证。"
+    "新增东八区当前时间、每日参考汇率转换、PDF/DOCX/XLSX 转 Markdown/TXT，"
+    "以及可直接嵌入网页的 Iframe 仓库。所有计算均由服务端完成。本 Skill 由官方维护，"
+    "覆盖当前全部对外接口，任何 AI 平台或智能体都可以直接按本文档调用，无需认证。"
 )
+
+IFRAME_RESPONSE_EXAMPLE = (
+    '{"slug":"milk-frog","name":"奶蛙","category":"图片展示",'
+    '"description":"奶蛙图片展示，可直接嵌入任意网页。",'
+    '"keywords":["奶蛙","图片","milk frog","iframe"],'
+    '"content_type":"image",'
+    '"content_url":"https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",'
+    '"thumbnail_url":"https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",'
+    '"embed_path":"/api/v1/iframes/milk-frog/embed",'
+    '"embed_url":"$BASE/api/v1/iframes/milk-frog/embed",'
+    '"width":640,"height":640,"sandbox":"","allow":""}'
+)
+
 
 CONVENTIONS = [
     "当前时间固定返回 UTC+08:00；既有时间戳转换接口仍返回 UTC。汇率是每日参考值，必须保留 rate_date、source 和 stale 信息。",
@@ -39,6 +52,7 @@ CONVENTIONS = [
     "图片 EXIF 工具使用 `multipart/form-data`，图片来源为 `image` 文件或 `image_url` 图片链接"
     "（二选一），编辑接口返回 JSON，通过 url 下载原格式图片，文件保留 2 小时。",
     "文件输出包含 url、filename、content_type、size（字节）、expires_at（UTC ISO 8601）；到期后服务端删除，正常运行时约有一分钟清理延迟，停机或删除失败后恢复补清理。",
+    "Iframe 目录与嵌入页无需认证；`GET /api/v1/iframes/{slug}/embed` 返回 `text/html`，可直接作为 iframe 的 `src`，缓存 5 分钟，图片自适应容器并跟随系统深浅色。",
     "时间戳值通过字符串传输，避免不同客户端对大整数或小数的精度差异。",
     "当前接口无需认证；CORS 允许所有来源，但不支持携带浏览器凭据的跨域请求。",
 ]
@@ -75,6 +89,7 @@ AI_GUIDANCE = [
     "编辑图片前先用 `inspect` 或 `tags` 确认可写标签，再用 `edit` 提交 `changes`；"
     "`edit` 返回 JSON，使用 url 下载文件，并向用户提示 expires_at 到期时间。",
     "失败时依据 HTTP 状态与 `code` 处理，不要解析中文提示文本。",
+    "需要嵌入网页挂件时，先读取 `/api/v1/iframes` 目录，使用返回的 `embed_url` 作为 iframe 地址；未知 slug 返回 404。",
     "需要程序化描述时读取 OpenAPI 定义，或调用工具目录接口动态发现能力。",
 ]
 
@@ -116,6 +131,51 @@ PUBLIC_ENDPOINTS: list[Endpoint] = [
             '{"slug":"json","name":"JSON 工具","category":"数据处理",'
             '"description":"格式化、压缩和校验 JSON 内容。",'
             '"keywords":["json","格式化","压缩","校验"]}'
+        ),
+    },
+    {
+        "method": "GET",
+        "path": "/iframes",
+        "name": "Iframe 仓库目录",
+        "summary": (
+            "返回可直接嵌入网页的 iframe 条目，包含内容类型、原始地址、"
+            "嵌入地址和推荐尺寸。"
+        ),
+        "request": "可选查询参数 `q`，最多 100 字符，在名称、分类、描述和关键词中搜索。",
+        "request_format": "query",
+        "request_example": "GET $BASE/api/v1/iframes?q=奶蛙",
+        "request_language": "http",
+        "response_example": '{"iframes":[' + IFRAME_RESPONSE_EXAMPLE + "]}",
+    },
+    {
+        "method": "GET",
+        "path": "/iframes/{slug}",
+        "name": "Iframe 条目详情",
+        "summary": "按 slug 返回单个 iframe 条目；未知 slug 返回 404。",
+        "request": "路径参数 `slug`，例如 milk-frog。",
+        "request_format": "path",
+        "request_example": "GET $BASE/api/v1/iframes/milk-frog",
+        "request_language": "http",
+        "response_example": IFRAME_RESPONSE_EXAMPLE,
+    },
+    {
+        "method": "GET",
+        "path": "/iframes/{slug}/embed",
+        "name": "Iframe 嵌入页",
+        "summary": (
+            "返回可直接作为 iframe src 的 HTML 页面；"
+            "图片自适应容器并跟随系统深浅色。"
+        ),
+        "request": "路径参数 `slug`；响应类型 text/html，缓存 5 分钟。",
+        "request_format": "path",
+        "request_example": "GET $BASE/api/v1/iframes/milk-frog/embed",
+        "request_language": "http",
+        "response_language": "html",
+        "response_example": (
+            '<!doctype html>\n<html lang="zh-CN">\n<head>\n'
+            '<meta charset="utf-8">\n<title>奶蛙</title>\n</head>\n<body>\n'
+            '<img src="https://officialimages.glassous.top/other/'
+            '%E5%A5%B6%E8%9B%99.png" alt="奶蛙">\n</body>\n</html>'
         ),
     },
     {

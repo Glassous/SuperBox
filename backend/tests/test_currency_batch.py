@@ -191,7 +191,7 @@ def test_batch_schema_and_skill_examples_are_published():
         paths = client.get("/api/v1/openapi.json").json()["paths"]
         assert "/api/v1/currency/convert-batch" in paths
         manifest = client.get("/api/v1/skill.json").json()
-        assert manifest["version"] == "1.2.0"
+        assert manifest["version"] == "1.4.0"
         endpoint = next(item for item in manifest["endpoints"] if item["path"] == "/currency/convert-batch")
         assert isinstance(json.loads(endpoint["request_example"])["to_currencies"], list)
         assert json.loads(endpoint["response_example"])["count"] == 3

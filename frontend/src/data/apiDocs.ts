@@ -14,11 +14,13 @@ export interface ApiOperation {
   summary: string
   path: string
   fields: ApiField[]
+  pathParams?: ApiField[]
   exampleBody: Record<string, string>
-  exampleResponse: Record<string, unknown>
+  exampleResponse: unknown
   note?: string
   method?: 'GET' | 'POST'
   multipart?: boolean
+  responseType?: 'json' | 'text'
 }
 
 export interface ApiToolDoc {
@@ -35,6 +37,26 @@ const textField: ApiField = {
   type: 'string',
   description: '必填，1 至 1,000,000 个字符。',
   multiline: true,
+}
+
+const exampleApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087').replace(/\/$/, '')
+const milkFrogEmbedPath = '/api/v1/iframes/milk-frog/embed'
+
+const milkFrogExample = {
+  slug: 'milk-frog',
+  name: '奶蛙',
+  category: '图片展示',
+  description: '奶蛙图片展示，可直接嵌入任意网页。',
+  keywords: ['奶蛙', '图片', 'milk frog', 'iframe'],
+  content_type: 'image',
+  content_url: 'https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png',
+  thumbnail_url: 'https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png',
+  embed_path: milkFrogEmbedPath,
+  embed_url: `${exampleApiBaseUrl}${milkFrogEmbedPath}`,
+  width: 640,
+  height: 640,
+  sandbox: '',
+  allow: '',
 }
 
 export const apiDocs: ApiToolDoc[] = [
@@ -236,6 +258,50 @@ export const apiDocs: ApiToolDoc[] = [
       },
     ],
   },
+  {
+    slug: 'iframes',
+    name: 'Iframe 仓库',
+    category: '网页挂件',
+    description: '获取可直接嵌入网页的 Iframe 条目，并在页面内预览与复制嵌入代码。',
+    operations: [
+      {
+        id: 'list',
+        name: 'Iframe 目录',
+        summary: '返回全部条目；可用 q 搜索名称、分类、描述和关键词。',
+        path: '/iframes',
+        method: 'GET',
+        fields: [{ name: 'q', label: '关键词', type: 'string', description: '可选，最多 100 字符。' }],
+        exampleBody: { q: '奶蛙' },
+        exampleResponse: { iframes: [milkFrogExample] },
+        note: '目录与嵌入页无需认证；embed_url 由当前 API 地址与 embed_path 拼接，可直接作为 iframe 的 src。',
+      },
+      {
+        id: 'detail',
+        name: 'Iframe 详情',
+        summary: '按 slug 返回单个条目，未知 slug 返回 404。',
+        path: '/iframes/{slug}',
+        method: 'GET',
+        pathParams: [{ name: 'slug', label: 'Iframe slug', type: 'string', description: '条目标识，例如 milk-frog。' }],
+        fields: [],
+        exampleBody: { slug: 'milk-frog' },
+        exampleResponse: milkFrogExample,
+        note: '未知 slug 返回 404 / NOT_FOUND。',
+      },
+      {
+        id: 'embed',
+        name: '嵌入页',
+        summary: '返回可直接作为 iframe src 的 HTML 页面。',
+        path: '/iframes/{slug}/embed',
+        method: 'GET',
+        pathParams: [{ name: 'slug', label: 'Iframe slug', type: 'string', description: '条目标识，例如 milk-frog。' }],
+        fields: [],
+        exampleBody: { slug: 'milk-frog' },
+        responseType: 'text',
+        exampleResponse: '<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>奶蛙</title>\n</head>\n<body>\n<img src="https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png" alt="奶蛙">\n</body>\n</html>',
+        note: '响应类型 text/html，缓存 5 分钟；图片自适应容器并跟随系统深浅色；禁止脚本与外部样式。',
+      },
+    ],
+  },
 ]
 
 export function apiFieldValue(type: string, value: string): unknown {
@@ -258,11 +324,26 @@ export function apiExampleBody(operation: ApiOperation): Record<string, unknown>
     apiFieldValue(operation.fields.find(field => field.name === key)?.type ?? 'string', value)]))
 }
 
+function operationPath(operation: ApiOperation): string {
+  return (operation.pathParams ?? []).reduce(
+    (path, param) => path.replace(`{${param.name}}`, encodeURIComponent(operation.exampleBody[param.name] ?? '')),
+    operation.path,
+  )
+}
+
+function exampleResponseText(operation: ApiOperation): string {
+  return typeof operation.exampleResponse === 'string'
+    ? operation.exampleResponse
+    : JSON.stringify(operation.exampleResponse)
+}
+
 export function makeAiPrompt(doc: ApiToolDoc, baseUrl: string): string {
-  const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operation.path}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(apiExampleBody(operation))}；成功响应示例 ${JSON.stringify(operation.exampleResponse)}`).join('\n')
+  const endpoints = doc.operations.map(operation => `- ${operation.method ?? 'POST'} ${baseUrl}/api/v1${operationPath(operation)}（${operation.name}）：${operation.multipart ? 'multipart/form-data' : 'JSON／查询参数'}，请求 ${JSON.stringify(apiExampleBody(operation))}；成功响应示例 ${exampleResponseText(operation)}`).join('\n')
   const transport = doc.operations.some(operation => operation.multipart)
     ? '文件接口使用 multipart/form-data，文件与公开链接二选一；不要手工设置 multipart 的 Content-Type，让客户端生成 boundary。所有工具接口返回 JSON。文件输出包含 COS 下载地址 url、filename、content_type、size 和 expires_at，文件保留 2 小时。'
-    : 'GET 无请求体；POST 使用 JSON，Content-Type: application/json。各字段类型以接口文档为准。'
+    : doc.operations.some(operation => operation.responseType === 'text')
+      ? 'GET 无请求体；嵌入页接口返回 text/html，其余接口返回 JSON，Content-Type: application/json。'
+      : 'GET 无请求体；POST 使用 JSON，Content-Type: application/json。各字段类型以接口文档为准。'
   const notes = doc.operations.map(operation => operation.note).filter(Boolean).join('\n')
-  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写工具计算。\n\nAPI 基础地址：${baseUrl}/api/v1\n${transport} 当前接口不需要认证。\n${endpoints}\n${notes}\n\n请补齐请求与响应类型、调用函数、加载与错误状态。HTTP 400 / INVALID_INPUT，422 / VALIDATION_ERROR，413 表示容量超限，429 / TOOL_BUSY，503 表示服务不可用，504 / DOCUMENT_TIMEOUT；依据 HTTP 状态和 code 处理，不解析中文提示。API 地址放在环境配置中。文件转换结果的 result 用于预览和复制；保存文件时通过 url 下载，expires_at 为 UTC 到期时间。金额精度运算全部交给服务器。如果我还没有提供项目技术栈或目标页面，先向我确认。`
+  return `请帮我在现有项目中接入 Superbox 的「${doc.name}」API。先阅读项目现有的请求封装和代码风格，再根据我的技术栈实现调用，不要在客户端重写服务端逻辑。\n\nAPI 基础地址：${baseUrl}/api/v1\n${transport} 当前接口不需要认证。\n${endpoints}\n${notes}\n\n请补齐请求与响应类型、调用函数、加载与错误状态。HTTP 400 / INVALID_INPUT，422 / VALIDATION_ERROR，413 表示容量超限，429 / TOOL_BUSY，503 表示服务不可用，504 / DOCUMENT_TIMEOUT；依据 HTTP 状态和 code 处理，不解析中文提示。API 地址放在环境配置中。文件转换结果的 result 用于预览和复制；保存文件时通过 url 下载，expires_at 为 UTC 到期时间。金额精度运算全部交给服务器。如果我还没有提供项目技术栈或目标页面，先向我确认。`
 }

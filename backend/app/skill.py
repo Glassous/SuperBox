@@ -34,7 +34,7 @@ def _render_endpoint(lines: list[str], endpoint: Endpoint, base: str, level: int
     lines.append(f"{endpoint.get('response_label', '成功响应示例')}：")
     lines.append("")
     lines.append(f"```{endpoint.get('response_language', 'json')}")
-    lines.append(endpoint["response_example"])
+    lines.append(endpoint["response_example"].replace("$BASE", base))
     lines.append("```")
     lines.append("")
 
@@ -106,7 +106,7 @@ def _manifest_endpoint(
         "request_example_language": endpoint.get("request_language", "json")
         if request_example
         else None,
-        "response_example": endpoint["response_example"],
+        "response_example": endpoint["response_example"].replace("$BASE", base),
         "response_example_language": endpoint.get("response_language", "json"),
     }
 

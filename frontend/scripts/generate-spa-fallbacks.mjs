@@ -46,7 +46,7 @@ await access(indexPath).catch(() => {
   throw new Error('未找到 dist/index.html，请先执行 vite build')
 })
 
-const routes = ['api-access', ...fromFiles.map(slug => `tools/${slug}`)]
+const routes = ['api-access', 'iframes', ...fromFiles.map(slug => `tools/${slug}`)]
 for (const route of routes) {
   const target = join(dist, route, 'index.html')
   await mkdir(dirname(target), { recursive: true })

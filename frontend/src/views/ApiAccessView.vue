@@ -28,7 +28,7 @@ const activeSlug = ref<string | null>(null)
 
       <SkillAccessSection />
 
-      <div class="mt-10 flex items-end justify-between gap-4"><div><h2 class="text-xl font-bold text-slate-950 dark:text-white">选择接口能力</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">点击卡片查看完整接入方式。</p></div><span class="font-mono text-xs text-slate-400">{{ String(apiDocs.length).padStart(2, '0') }} TOOLS</span></div>
+      <div class="mt-10 flex items-end justify-between gap-4"><div><h2 class="text-xl font-bold text-slate-950 dark:text-white">选择接口能力</h2><p class="mt-1 text-sm text-slate-500 dark:text-slate-400">点击卡片查看完整接入方式。</p></div><span class="font-mono text-xs text-slate-400">{{ String(apiDocs.length).padStart(2, '0') }} APIS</span></div>
       <div class="mt-6 grid items-start gap-5 md:grid-cols-2 xl:grid-cols-4">
         <ExpandableApiCard v-for="doc in apiDocs" :key="doc.slug" :doc="doc" :overlay-host="overlayHost"
           :disabled="Boolean(activeSlug)" @opened="activeSlug = doc.slug" @closed="activeSlug = null" />

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ApiError, executeOperation, type FileResult } from '../api/client'
 import type { ApiOperation } from '../data/apiDocs'
 
 const props = defineProps<{ operation: ApiOperation }>()
+const fields = computed(() => [...(props.operation.pathParams ?? []), ...props.operation.fields])
 const values = ref<Record<string, string>>({})
 const responseText = ref('')
 const status = ref<number | null>(null)
@@ -42,7 +43,7 @@ async function sendRequest() {
     if (response && typeof response === 'object' && 'url' in response && 'expires_at' in response && 'filename' in response) {
       outputFile.value = response as FileResult
     }
-    responseText.value = JSON.stringify(response, null, 2)
+    responseText.value = typeof response === 'string' ? response : JSON.stringify(response, null, 2)
     status.value = 200
   } catch (cause) {
     if (current !== requestId) return
@@ -69,7 +70,7 @@ async function sendRequest() {
       <button type="button" :disabled="loading" class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60" @click="sendRequest">{{ loading ? '发送中…' : '发送请求' }}</button>
     </div>
     <div class="mt-5 grid gap-4 sm:grid-cols-2">
-      <label v-for="field in operation.fields" :key="field.name" class="block" :class="field.multiline ? 'sm:col-span-2' : ''">
+      <label v-for="field in fields" :key="field.name" class="block" :class="field.multiline ? 'sm:col-span-2' : ''">
         <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ field.label }} <span class="font-mono font-normal text-slate-400">{{ field.name }}</span></span>
         <select v-if="field.options" v-model="values[field.name]" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-[#141a2c] dark:text-white">
           <option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option>

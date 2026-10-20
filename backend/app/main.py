@@ -15,7 +15,7 @@ from app.file_storage import lifespan
 app = FastAPI(
     title="Superbox API",
     description="工具箱的版本化 HTTP 接口。所有工具计算均在服务端完成。",
-    version="1.3.0",
+    version="1.4.0",
     lifespan=lifespan,
     openapi_url="/api/v1/openapi.json",
 )

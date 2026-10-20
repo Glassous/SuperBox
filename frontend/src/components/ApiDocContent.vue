@@ -2,20 +2,35 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import ApiTryForm from './ApiTryForm.vue'
 import { apiBaseUrl } from '../api/client'
-import { apiExampleBody, makeAiPrompt, type ApiToolDoc } from '../data/apiDocs'
+import { apiExampleBody, makeAiPrompt, type ApiOperation, type ApiToolDoc } from '../data/apiDocs'
 
 const props = defineProps<{ doc: ApiToolDoc }>()
 const selectedOperationId = ref(props.doc.operations[0]?.id ?? '')
 const operationContent = ref<HTMLElement | null>(null)
 const copied = ref<'endpoint' | 'example' | 'prompt' | null>(null)
 const currentOperation = computed(() => props.doc.operations.find(operation => operation.id === selectedOperationId.value) ?? props.doc.operations[0])
+const requestFields = computed(() => currentOperation.value ? [...(currentOperation.value.pathParams ?? []), ...currentOperation.value.fields] : [])
 const aiPrompt = computed(() => makeAiPrompt(props.doc, apiBaseUrl))
-const endpointUrl = computed(() => currentOperation.value ? `${apiBaseUrl}/api/v1${currentOperation.value.path}` : '')
+function operationPath(operation: ApiOperation) {
+  return (operation.pathParams ?? []).reduce(
+    (path, param) => path.replace(`{${param.name}}`, encodeURIComponent(operation.exampleBody[param.name] ?? '')),
+    operation.path,
+  )
+}
+const endpointUrl = computed(() => currentOperation.value ? `${apiBaseUrl}/api/v1${operationPath(currentOperation.value)}` : '')
+const responseExample = computed(() => {
+  const example = currentOperation.value?.exampleResponse
+  return typeof example === 'string' ? example : JSON.stringify(example, null, 2)
+})
 const fetchExample = computed(() => {
   if (!currentOperation.value) return ''
   const operation = currentOperation.value
+  if (operation.responseType === 'text') {
+    return `const response = await fetch('${endpointUrl.value}');\nconst html = await response.text();`
+  }
   if (operation.method === 'GET') {
-    const query = new URLSearchParams(operation.exampleBody).toString()
+    const pathNames = new Set((operation.pathParams ?? []).map(param => param.name))
+    const query = new URLSearchParams(Object.entries(operation.exampleBody).filter(([key]) => !pathNames.has(key))).toString()
     return `const response = await fetch('${endpointUrl.value}${query ? '?' + query : ''}');\nconst data = await response.json();`
   }
   if (operation.multipart) {
@@ -69,7 +84,7 @@ async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
               <section>
                 <h4 class="text-sm font-bold text-slate-900 dark:text-white">请求字段</h4>
                 <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
-                  <div v-for="field in currentOperation.fields" :key="field.name" class="grid gap-1 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-white/10 sm:grid-cols-[160px_1fr]">
+                  <div v-for="field in requestFields" :key="field.name" class="grid gap-1 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-white/10 sm:grid-cols-[160px_1fr]">
                     <div><code class="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{{ field.name }}</code><span class="ml-2 text-[11px] text-slate-400">{{ field.type }}</span></div>
                     <p class="text-xs leading-5 text-slate-500 dark:text-slate-400">{{ field.description }}</p>
                   </div>
@@ -84,7 +99,7 @@ async function copy(value: string, kind: 'endpoint' | 'example' | 'prompt') {
                 </section>
                 <section class="min-w-0 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
                   <div class="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">成功响应示例</div>
-                  <pre class="max-h-40 overflow-auto p-4 font-mono text-xs leading-5 text-slate-700 dark:text-slate-200">{{ JSON.stringify(currentOperation.exampleResponse, null, 2) }}</pre>
+                  <pre class="max-h-40 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-xs leading-5 text-slate-700 dark:text-slate-200">{{ responseExample }}</pre>
                 </section>
               </div>
 

@@ -129,15 +129,18 @@ def test_wildcard_cors_and_openapi():
     assert client.get("/docs").status_code == 200
     paths = client.get(f"{API}/openapi.json").json()["paths"]
     for path in [
-        f"{API}/tools", f"{API}/json/format", f"{API}/base64/decode",
-        f"{API}/url/encode", f"{API}/timestamp/to-unix",
+        f"{API}/tools", f"{API}/iframes", f"{API}/json/format",
+        f"{API}/base64/decode", f"{API}/url/encode", f"{API}/timestamp/to-unix",
     ]:
         assert path in paths
 
 
 def test_every_tool_has_an_interface_document():
     docs = Path(__file__).resolve().parents[2] / "docs"
-    for slug in ["json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"]:
+    for slug in [
+        "json", "base64", "url", "timestamp", "exif", "time", "currency",
+        "documents", "iframes",
+    ]:
         assert (docs / f"{slug}.md").is_file()
 
 
@@ -148,8 +151,10 @@ def test_skill_markdown_document():
     body = response.text
     assert body.startswith("# Superbox API 官方 Skill")
     assert "http://testserver/api/v1" in body
+    assert "http://testserver/api/v1/iframes/milk-frog/embed" in body
     for path in [
         "/health", "/tools", "/tools/{slug}", "/openapi.json",
+        "/iframes", "/iframes/{slug}", "/iframes/{slug}/embed",
         "/json/format", "/json/minify", "/json/validate",
         "/base64/encode", "/base64/decode",
         "/url/encode", "/url/decode",
@@ -177,7 +182,7 @@ def test_skill_json_manifest():
         "json", "base64", "url", "timestamp", "exif", "time", "currency", "documents"
     ]
     endpoints = manifest["endpoints"]
-    assert manifest["endpoints_total"] == len(endpoints) == 21
+    assert manifest["endpoints_total"] == len(endpoints) == 24
     by_path = {endpoint["path"]: endpoint for endpoint in endpoints}
     for endpoint in endpoints:
         assert endpoint["url"] == f"http://testserver/api/v1{endpoint['path']}"
@@ -187,13 +192,21 @@ def test_skill_json_manifest():
     assert by_path["/exif/edit"]["tool"] == "exif"
     assert by_path["/health"]["request_format"] == "none"
     assert by_path["/health"]["tool"] is None
+    assert by_path["/iframes"]["request_format"] == "query"
+    assert by_path["/iframes/{slug}/embed"]["request_format"] == "path"
+    assert by_path["/iframes/{slug}/embed"]["tool"] is None
+    assert (
+        '"embed_url":"http://testserver/api/v1/iframes/milk-frog/embed"'
+        in by_path["/iframes/{slug}"]["response_example"]
+    )
     assert (
         by_path["/json/format"]["request_example"]
         == r'{"text":"{\"name\":\"中文\"}"}'
     )
     assert {error["code"] for error in manifest["errors"]} == {
         "INVALID_INPUT", "NOT_FOUND", "FILE_TOO_LARGE", "VALIDATION_ERROR", "EXIF_UNAVAILABLE",
-        "DOCUMENT_LIMIT_EXCEEDED", "TOOL_BUSY", "EXCHANGE_RATE_UNAVAILABLE", "DOCUMENT_UNAVAILABLE", "DOCUMENT_TIMEOUT"
+        "DOCUMENT_LIMIT_EXCEEDED", "TOOL_BUSY", "EXCHANGE_RATE_UNAVAILABLE", "DOCUMENT_UNAVAILABLE", "DOCUMENT_TIMEOUT",
+        "COS_UNAVAILABLE", "COS_UPLOAD_FAILED",
     }
     assert f"{API}/skill.json" in client.get(f"{API}/openapi.json").json()["paths"]
 

@@ -143,6 +143,27 @@ class ToolCatalogResult(BaseModel):
     tools: list[ToolMetadata]
 
 
+class IframeMetadata(BaseModel):
+    slug: str
+    name: str
+    category: str
+    description: str
+    keywords: list[str]
+    content_type: Literal["image", "page"]
+    content_url: str
+    thumbnail_url: str
+    embed_path: str
+    embed_url: str
+    width: int
+    height: int
+    sandbox: str
+    allow: str
+
+
+class IframeCatalogResult(BaseModel):
+    iframes: list[IframeMetadata]
+
+
 class HealthResult(BaseModel):
     status: Literal["ok"]
 

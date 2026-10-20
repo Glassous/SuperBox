@@ -1,4 +1,4 @@
-import type { ExifCatalogTag, ExifChange, ExifInspectResult, ToolInfo } from '../types'
+import type { ExifCatalogTag, ExifChange, ExifInspectResult, IframeInfo, ToolInfo } from '../types'
 import type { ApiOperation } from '../data/apiDocs'
 import { apiFieldValue } from '../data/apiDocs'
 
@@ -58,6 +58,15 @@ export function getTool(slug: string, signal?: AbortSignal): Promise<ToolInfo> {
   return request(`/tools/${encodeURIComponent(slug)}`, { signal })
 }
 
+export function getIframes(q = '', signal?: AbortSignal): Promise<{ iframes: IframeInfo[] }> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : ''
+  return request(`/iframes${query}`, { signal })
+}
+
+export function getIframe(slug: string, signal?: AbortSignal): Promise<IframeInfo> {
+  return request(`/iframes/${encodeURIComponent(slug)}`, { signal })
+}
+
 export function postTool<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body), signal })
 }
@@ -105,10 +114,16 @@ export function downloadFile(file: FileResult) {
 export async function executeOperation(operation: ApiOperation, values: Record<string, string>, file?: File | null, signal?: AbortSignal): Promise<unknown> {
   let path = operation.path
   const method = operation.method ?? 'POST'
+  const pathNames = new Set((operation.pathParams ?? []).map(param => param.name))
+  for (const param of operation.pathParams ?? []) {
+    const value = values[param.name] ?? ''
+    if (!value) throw new Error(`请填写路径参数 ${param.name}`)
+    path = path.replace(`{${param.name}}`, encodeURIComponent(value))
+  }
   let body: BodyInit | undefined
   let headers: Record<string, string> = {}
   if (method === 'GET') {
-    const params = new URLSearchParams(Object.entries(values).filter(([, value]) => value !== ''))
+    const params = new URLSearchParams(Object.entries(values).filter(([key, value]) => value !== '' && !pathNames.has(key)))
     if (params.size) path += `?${params}`
   } else if (operation.multipart) {
     const form = new FormData()
@@ -132,6 +147,7 @@ export async function executeOperation(operation: ApiOperation, values: Record<s
     const error = await response.json().catch(() => ({})) as ApiErrorBody
     throw new ApiError(error.message || '请求失败。', response.status, error.code)
   }
+  if (operation.responseType === 'text') return response.text()
   return response.json()
 }
 

@@ -6,6 +6,23 @@ export interface ToolInfo {
   keywords: string[]
 }
 
+export interface IframeInfo {
+  slug: string
+  name: string
+  category: string
+  description: string
+  keywords: string[]
+  content_type: 'image' | 'page'
+  content_url: string
+  thumbnail_url: string
+  embed_path: string
+  embed_url: string
+  width: number
+  height: number
+  sandbox: string
+  allow: string
+}
+
 export interface TextResult {
   result: string
 }

@@ -25,9 +25,11 @@ from app.schemas import (
     UnixTimestampInput,
     UnixTimestampResult,
     CurrentTimeResult, CurrencyInput, CurrencyCatalogResult, CurrencyResult, DocumentResult,
-    CurrencyBatchInput, CurrencyBatchResult,
+    CurrencyBatchInput, CurrencyBatchResult, IframeCatalogResult, IframeMetadata,
 )
-from app import exif, image_source, services, current_time, currency, documents, file_storage
+from app import (
+    exif, image_source, services, current_time, currency, documents, file_storage, iframes,
+)
 
 
 router = APIRouter(
@@ -119,6 +121,65 @@ def get_tool(slug: str) -> dict:
     if tool is None:
         raise HTTPException(status_code=404, detail="工具不存在")
     return tool
+
+
+def _iframe_metadata(item: iframes.IframeItem, request: Request) -> dict:
+    base = str(request.base_url)
+    return {
+        "slug": item["slug"],
+        "name": item["name"],
+        "category": item["category"],
+        "description": item["description"],
+        "keywords": item["keywords"],
+        "content_type": item["content_type"],
+        "content_url": item["content_url"],
+        "thumbnail_url": iframes.thumbnail(item),
+        "embed_path": iframes.embed_path(item["slug"]),
+        "embed_url": iframes.embed_url(base, item["slug"]),
+        "width": item["width"],
+        "height": item["height"],
+        "sandbox": item["sandbox"],
+        "allow": item["allow"],
+    }
+
+
+@router.get("/iframes", response_model=IframeCatalogResult, tags=["Iframes"])
+def list_iframes(
+    request: Request,
+    q: str = Query(default="", max_length=iframes.MAX_QUERY_LENGTH),
+) -> dict:
+    return {
+        "iframes": [
+            _iframe_metadata(item, request) for item in iframes.search(q)
+        ]
+    }
+
+
+@router.get("/iframes/{slug}", response_model=IframeMetadata, tags=["Iframes"])
+def get_iframe(slug: str, request: Request) -> dict:
+    item = iframes.find(slug)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Iframe 不存在")
+    return _iframe_metadata(item, request)
+
+
+@router.get(
+    "/iframes/{slug}/embed",
+    responses={200: {"content": {"text/html": {}}}},
+    tags=["Iframes"],
+)
+def get_iframe_embed(slug: str) -> Response:
+    item = iframes.find(slug)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Iframe 不存在")
+    return Response(
+        content=iframes.render_embed(item),
+        media_type="text/html",
+        headers={
+            "Cache-Control": iframes.EMBED_CACHE_CONTROL,
+            "Content-Security-Policy": iframes.content_security_policy(item),
+        },
+    )
 
 
 @router.post("/json/format", response_model=TextResult, tags=["JSON"])

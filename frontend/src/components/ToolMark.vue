@@ -13,6 +13,7 @@ defineProps<{ slug: string; size?: 'sm' | 'lg' }>()
       slug === 'timestamp' ? 'bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300' : '',
       slug === 'exif' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300' : '',
       ['time', 'currency', 'documents'].includes(slug) ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300' : '',
+      slug === 'iframes' ? 'bg-rose-100 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300' : '',
     ]"
   >
     <span v-if="slug === 'json'">{ }</span>
@@ -23,6 +24,7 @@ defineProps<{ slug: string; size?: 'sm' | 'lg' }>()
     <span v-else-if="slug === 'time'">◴</span>
     <span v-else-if="slug === 'currency'">¤</span>
     <span v-else-if="slug === 'documents'">≡</span>
+    <span v-else-if="slug === 'iframes'">▣</span>
     <span v-else>✦</span>
   </div>
 </template>
