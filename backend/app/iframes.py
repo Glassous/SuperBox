@@ -1,6 +1,6 @@
 """Iframe 仓库目录与嵌入页渲染。
 
-每个条目声明内容类型、原始地址、推荐尺寸和沙箱策略；嵌入页由本服务
+每个条目声明内容类型、原始地址、预览图、推荐尺寸和沙箱策略；嵌入页由本服务
 生成可直接作为 iframe src 的完整 HTML，消费方无需自行拼接样式。
 """
 
@@ -11,6 +11,8 @@ from typing import Literal, TypedDict
 MAX_QUERY_LENGTH = 100
 
 EMBED_CACHE_CONTROL = "public, max-age=300"
+
+MILK_FROG_IMAGE = "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png"
 
 IMAGE_CSP = (
     "default-src 'none'; img-src https: http: data:; "
@@ -30,7 +32,7 @@ class IframeItem(TypedDict):
     keywords: list[str]
     content_type: Literal["image", "page"]
     content_url: str
-    poster: str
+    preview_url: str
     width: int
     height: int
     sandbox: str
@@ -45,10 +47,9 @@ IFRAMES: list[IframeItem] = [
         "description": "奶蛙图片展示，可直接嵌入任意网页。",
         "keywords": ["奶蛙", "图片", "milk frog", "iframe"],
         "content_type": "image",
-        "content_url": (
-            "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png"
-        ),
-        "poster": "",
+        "content_url": MILK_FROG_IMAGE,
+        # 图片条目没有独立的预览图，直接复用实际展示的图片。
+        "preview_url": MILK_FROG_IMAGE,
         "width": 640,
         "height": 640,
         "sandbox": "",
@@ -83,10 +84,15 @@ def embed_url(base_url: str, slug: str) -> str:
     return f"{base_url.rstrip('/')}{embed_path(slug)}"
 
 
-def thumbnail(item: IframeItem) -> str:
-    if item["poster"]:
-        return item["poster"]
+def preview(item: IframeItem) -> str:
+    """预览图：优先使用条目声明，图片条目退回复用原始图片。"""
+    if item["preview_url"]:
+        return item["preview_url"]
     return item["content_url"] if item["content_type"] == "image" else ""
+
+
+def thumbnail(item: IframeItem) -> str:
+    return preview(item)
 
 
 def content_security_policy(item: IframeItem) -> str:

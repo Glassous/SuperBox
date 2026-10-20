@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { cancelToolTransition, finishToolTransition, getOpeningTool } from '../animations/toolOpenTransition'
+import { cancelCardTransition, finishCardTransition, getOpeningPayload } from '../animations/cardTransition'
 import { getTool } from '../api/client'
 import ToolMark from '../components/ToolMark.vue'
 import type { ToolInfo } from '../types'
@@ -29,7 +29,7 @@ watch(() => route.params.slug, async slug => {
   controller?.abort()
   controller = new AbortController()
   const current = controller
-  tool.value = getOpeningTool(String(slug))
+  tool.value = getOpeningPayload<ToolInfo>('tool', String(slug))
   error.value = ''
   loading.value = true
   try {
@@ -38,7 +38,7 @@ watch(() => route.params.slug, async slug => {
     if (!current.signal.aborted) {
       error.value = cause instanceof Error ? cause.message : '工具加载失败'
       tool.value = null
-      cancelToolTransition()
+      cancelCardTransition()
     }
   } finally {
     if (!current.signal.aborted) loading.value = false
@@ -47,7 +47,7 @@ watch(() => route.params.slug, async slug => {
 
 onMounted(async () => {
   await nextTick()
-  if (detail.value) finishToolTransition('open', String(route.params.slug), detail.value, body.value)
+  if (detail.value) finishCardTransition('tool', 'open', String(route.params.slug), detail.value, body.value)
 })
 
 onBeforeUnmount(() => controller?.abort())
@@ -58,12 +58,12 @@ onBeforeUnmount(() => controller?.abort())
     <div v-if="error" class="mt-9 rounded-2xl border border-rose-200 bg-rose-50 p-8 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300" role="alert">{{ error }}</div>
     <div v-else-if="!tool" class="mt-9 h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/5" aria-label="正在处理"></div>
     <template v-else>
-      <div ref="detail" data-tool-transition-detail class="flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div data-tool-transition="icon"><ToolMark :slug="tool.slug" size="lg" /></div>
+      <div ref="detail" data-card-transition-detail class="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div data-card-transition="icon"><ToolMark :slug="tool.slug" size="lg" /></div>
         <div>
-          <div data-tool-transition="category" class="text-xs font-bold tracking-[0.18em] text-indigo-600 dark:text-indigo-400">{{ tool.category }}</div>
-          <h1 data-tool-transition="title" class="mt-1 text-3xl font-bold tracking-tight text-slate-950 dark:text-white">{{ tool.name }}</h1>
-          <p data-tool-transition="description" class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ tool.description }}</p>
+          <div data-card-transition="category" class="text-xs font-bold tracking-[0.18em] text-indigo-600 dark:text-indigo-400">{{ tool.category }}</div>
+          <h1 data-card-transition="title" class="mt-1 text-3xl font-bold tracking-tight text-slate-950 dark:text-white">{{ tool.name }}</h1>
+          <p data-card-transition="description" class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ tool.description }}</p>
         </div>
       </div>
       <div ref="body" class="mt-9">

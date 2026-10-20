@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { beginToolTransition, isPlainNavigation } from '../animations/toolOpenTransition'
+import { beginCardTransition, isPlainNavigation, type CardKind } from '../animations/cardTransition'
 import ThemeIcon from './ThemeIcon.vue'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 
@@ -9,6 +9,10 @@ const route = useRoute()
 const { theme, themeLabels, setTheme } = useTheme()
 const themeMenuOpen = ref(false)
 const themeMenu = ref<HTMLElement | null>(null)
+const isDetail = computed(() => route.name === 'tool' || route.name === 'iframe')
+const backKind = computed<CardKind>(() => route.name === 'iframe' ? 'iframe' : 'tool')
+const backTo = computed(() => backKind.value === 'iframe' ? '/iframes' : '/')
+const backLabel = computed(() => backKind.value === 'iframe' ? '返回 Iframe 仓库' : '返回全部工具')
 
 onMounted(() => {
   document.addEventListener('pointerdown', closeThemeMenuOutside)
@@ -28,10 +32,10 @@ function chooseTheme(mode: ThemeMode) {
 }
 
 function beginReturn(event: MouseEvent) {
-  if (!isPlainNavigation(event)) return
-  const detail = document.querySelector<HTMLElement>('[data-tool-transition-detail]')
+  if (!isDetail.value || !isPlainNavigation(event)) return
+  const detail = document.querySelector<HTMLElement>('[data-card-transition-detail]')
   if (detail && typeof route.params.slug === 'string') {
-    beginToolTransition('return', route.params.slug, detail)
+    beginCardTransition(backKind.value, 'return', route.params.slug, detail)
   }
 }
 </script>
@@ -39,9 +43,9 @@ function beginReturn(event: MouseEvent) {
 <template>
   <header class="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-slate-200/70 bg-[#f6f8fc]/90 px-5 backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1020]/90 sm:px-9">
     <div class="flex min-w-0 items-center gap-3">
-      <RouterLink v-if="route.name === 'tool'" to="/" class="inline-flex min-h-9 items-center gap-1.5 text-sm font-semibold text-slate-600 transition hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300" @click.capture="beginReturn">
+      <RouterLink v-if="isDetail" :to="backTo" class="inline-flex min-h-9 items-center gap-1.5 text-sm font-semibold text-slate-600 transition hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300" @click.capture="beginReturn">
         <svg class="relative top-px h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 3.5-5 4.5 5 4.5" /></svg>
-        <span>返回全部工具</span>
+        <span>{{ backLabel }}</span>
       </RouterLink>
       <RouterLink v-else to="/" class="flex items-center gap-2.5">
         <img src="/favicon.svg" alt="" width="36" height="36" class="h-9 w-9 shrink-0" />

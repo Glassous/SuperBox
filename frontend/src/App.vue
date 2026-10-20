@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
-import { cancelToolTransition, cancelTransitionOutsideRoute, setToolTransitionHost } from './animations/toolOpenTransition'
+import { cancelCardTransition, cancelTransitionOutsideRoute, setCardTransitionHost } from './animations/cardTransition'
 import SiteHeader from './components/SiteHeader.vue'
 import { useTheme } from './composables/useTheme'
 
@@ -9,10 +9,10 @@ const route = useRoute()
 const { dark } = useTheme()
 const transitionHost = ref<HTMLElement | null>(null)
 
-onMounted(() => setToolTransitionHost(transitionHost.value))
+onMounted(() => setCardTransitionHost(transitionHost.value))
 onBeforeUnmount(() => {
-  cancelToolTransition()
-  setToolTransitionHost(null)
+  cancelCardTransition()
+  setCardTransitionHost(null)
 })
 watch(() => route.fullPath, () => cancelTransitionOutsideRoute(route.name, route.params.slug))
 </script>

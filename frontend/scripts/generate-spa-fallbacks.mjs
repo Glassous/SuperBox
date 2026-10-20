@@ -35,7 +35,20 @@ async function slugsFromToolView() {
   return slugs.sort()
 }
 
-const [fromFiles, fromView] = await Promise.all([slugsFromToolFiles(), slugsFromToolView()])
+// Iframe 详情页是 /iframes/<slug>，条目定义在后端目录里；只部署前端时跳过。
+async function slugsFromIframes() {
+  const path = join(root, '..', 'backend', 'app', 'iframes.py')
+  try {
+    const source = await readFile(path, 'utf8')
+    return [...source.matchAll(/"slug"\s*:\s*"([^"]+)"/g)].map(match => match[1]).sort()
+  } catch {
+    return []
+  }
+}
+
+const [fromFiles, fromView, iframeSlugs] = await Promise.all([
+  slugsFromToolFiles(), slugsFromToolView(), slugsFromIframes(),
+])
 if (fromFiles.join(',') !== fromView.join(',')) {
   throw new Error(
     `工具路由不一致：src/tools 目录为 [${fromFiles.join(', ')}]，ToolView.vue 的 forms 为 [${fromView.join(', ')}]，请先对齐再构建`,
@@ -46,7 +59,12 @@ await access(indexPath).catch(() => {
   throw new Error('未找到 dist/index.html，请先执行 vite build')
 })
 
-const routes = ['api-access', 'iframes', ...fromFiles.map(slug => `tools/${slug}`)]
+const routes = [
+  'api-access',
+  'iframes',
+  ...iframeSlugs.map(slug => `iframes/${slug}`),
+  ...fromFiles.map(slug => `tools/${slug}`),
+]
 for (const route of routes) {
   const target = join(dist, route, 'index.html')
   await mkdir(dirname(target), { recursive: true })

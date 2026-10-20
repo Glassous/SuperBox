@@ -25,6 +25,7 @@ def test_iframe_catalog_search_and_detail():
         "keywords": ["奶蛙", "图片", "milk frog", "iframe"],
         "content_type": "image",
         "content_url": IMAGE_URL,
+        "preview_url": IMAGE_URL,
         "thumbnail_url": IMAGE_URL,
         "embed_path": "/api/v1/iframes/milk-frog/embed",
         "embed_url": "http://testserver/api/v1/iframes/milk-frog/embed",
@@ -33,6 +34,9 @@ def test_iframe_catalog_search_and_detail():
         "sandbox": "",
         "allow": "",
     }
+    # 图片条目的预览图与实际效果复用同一张图片。
+    assert item["preview_url"] == item["content_url"]
+    assert item["thumbnail_url"] == item["content_url"]
     assert [
         entry["slug"] for entry in client.get(f"{API}/iframes?q=奶蛙").json()["iframes"]
     ] == ["milk-frog"]

@@ -2,7 +2,7 @@
 
 基础地址：`http://localhost:8087/api/v1`。现有文本转换工具使用 JSON 请求与响应，字符串输入长度为 1 至 1,000,000 个字符。当前时间通过 GET 获取；汇率转换使用十进制字符串金额和 JSON 请求。图片 EXIF 与文件转换使用 multipart 上传文件或公开文件链接，EXIF 编辑返回包含 COS 下载地址的 JSON；文件转换保留 Markdown/TXT 正文，并增加下载地址。文件输出包含 url、filename、content_type、size（字节）、expires_at（UTC），保留 2 小时。Iframe 仓库不属于 `/tools` 工具目录，除元数据 JSON 外还提供返回 HTML 的嵌入页。各工具的限制见对应文档。所有工具运算和搜索均由后端执行。
 
-面向接入方的页面位于前端路由 `/api-access`，提供 AI 平台 Skill 接口（官方 Skill 与 JSON 清单，可复制地址）以及按工具划分的接口说明、在线测试与 AI 接入提示词；Iframe 仓库位于 `/iframes`，支持搜索、预览与复制嵌入代码。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
+面向接入方的页面位于前端路由 `/api-access`，提供 AI 平台 Skill 接口（官方 Skill 与 JSON 清单，可复制地址）以及按工具划分的接口说明、在线测试与 AI 接入提示词；Iframe 仓库位于 `/iframes`，支持搜索，并以卡片翻转过渡进入 `/iframes/{slug}` 的大卡片预览、复制嵌入代码。本目录中的 Markdown 文档保留接口契约，FastAPI 的 `/docs` 仅作为自动生成的技术参考。
 
 | 功能 | 文档 |
 | --- | --- |

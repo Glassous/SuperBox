@@ -151,6 +151,7 @@ class IframeMetadata(BaseModel):
     keywords: list[str]
     content_type: Literal["image", "page"]
     content_url: str
+    preview_url: str
     thumbnail_url: str
     embed_path: str
     embed_url: str

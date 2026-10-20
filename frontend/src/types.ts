@@ -14,6 +14,7 @@ export interface IframeInfo {
   keywords: string[]
   content_type: 'image' | 'page'
   content_url: string
+  preview_url: string
   thumbnail_url: string
   embed_path: string
   embed_url: string

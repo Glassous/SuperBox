@@ -8,7 +8,7 @@
 
 文件转换按需启动受限子进程：最大文件 5 MiB、并发 1、256 MiB 内存、10 秒 CPU、15 秒解析时间；支持 Linux 和 Windows，不执行 OCR 或公式。Compose 采用单 API worker，容器内存和 swap 总上限均为 512 MiB。汇率由服务器请求 Frankfurter 最新可用每日参考数据，不需要 API Key。细节见 [文件转换](docs/documents.md) 和 [汇率转换](docs/currency.md)。
 
-Iframe 仓库作为独立资源，不进入 `/api/v1/tools` 工具目录，避免客户端生成不可打开的卡片。首条数据为「奶蛙」（`slug=milk-frog`，图片展示，推荐 640×640）；后端渲染可直接作为 `iframe src` 的 HTML 嵌入页，带 5 分钟公共缓存与按内容类型生成的 CSP，不设置 `X-Frame-Options`。网页 `/iframes` 支持搜索、点击标题预览和复制嵌入代码。细节见 [Iframe 仓库](docs/iframes.md)。
+Iframe 仓库作为独立资源，不进入 `/api/v1/tools` 工具目录，避免客户端生成不可打开的卡片。首条数据为「奶蛙」（`slug=milk-frog`，图片展示，推荐 640×640）；后端渲染可直接作为 `iframe src` 的 HTML 嵌入页，带 5 分钟公共缓存与按内容类型生成的 CSP，不设置 `X-Frame-Options`。每条目录项新增 `preview_url` 预览图字段：网页 `/iframes` 用卡片封面，点击后以共享元素翻转过渡进入 `/iframes/{slug}`，在大卡片中预览效果并复制嵌入代码；预览图与详情页共用同一份已加载位图，往返不会重新请求。细节见 [Iframe 仓库](docs/iframes.md)。
 
 ## 本地开发
 
@@ -32,7 +32,7 @@ npm install
 npm run dev
 ```
 
-浏览器访问 Vite 输出的前端地址。顶栏“API 接入”会在新标签页打开独立的 `/api-access` 页面：页头下方展示 AI 平台 Skill 的两个接口（官方 Markdown 与 JSON 清单，可复制地址或打开查看），工具卡片区按工具提供接口示例、在线测试和可复制的 AI 接入提示词；顶栏“Iframe 仓库”打开 `/iframes`，支持搜索、点击标题预览与复制标准嵌入代码，直达链接为 `/iframes?preview=milk-frog`。API 位于 `http://localhost:8087`；`http://localhost:8087/api/v1/skill` 返回一份覆盖全部能力的官方 Skill（纯 Markdown），`http://localhost:8087/api/v1/skill.json` 提供同源的结构化 JSON 清单（功能介绍与接入方式），均可交给其他 AI 平台按 URL 拉取。FastAPI 自动生成的交互式文档仍可在 `http://localhost:8087/docs` 用于内部核对，OpenAPI 定义位于 `http://localhost:8087/api/v1/openapi.json`。
+浏览器访问 Vite 输出的前端地址。顶栏“API 接入”会在新标签页打开独立的 `/api-access` 页面：页头下方展示 AI 平台 Skill 的两个接口（官方 Markdown 与 JSON 清单，可复制地址或打开查看），工具卡片区按工具提供接口示例、在线测试和可复制的 AI 接入提示词；顶栏“Iframe 仓库”打开 `/iframes`，支持搜索与卡片式翻转进入详情；条目详情直达链接为 `/iframes/milk-frog`，可预览效果并复制标准嵌入代码。API 位于 `http://localhost:8087`；`http://localhost:8087/api/v1/skill` 返回一份覆盖全部能力的官方 Skill（纯 Markdown），`http://localhost:8087/api/v1/skill.json` 提供同源的结构化 JSON 清单（功能介绍与接入方式），均可交给其他 AI 平台按 URL 拉取。FastAPI 自动生成的交互式文档仍可在 `http://localhost:8087/docs` 用于内部核对，OpenAPI 定义位于 `http://localhost:8087/api/v1/openapi.json`。
 
 ## 仅后端容器化部署
 
@@ -66,7 +66,7 @@ location / {
 
 GitHub Actions 部署流程会自动执行 `scripts/configure-site-fallback.sh`（步骤“确保站点支持 History 路由直达”），域名与站点目录取自工作流中的 `SITE_DOMAIN`、`WEB_ROOT`；若该步骤报错，按上面的方式二手动处理即可。
 
-`npm run build` 还会为每个前端路由生成目录索引（`dist/api-access/index.html`、`dist/iframes/index.html`、`dist/tools/<slug>/index.html`）：即使站点暂时没有回退规则，这些直达链接也能打开。工具列表变化时构建会自动补齐，无需手工维护；Iframe 预览使用查询参数，`dist/iframes/index.html` 单页即可覆盖所有条目。
+`npm run build` 还会为每个前端路由生成目录索引（`dist/api-access/index.html`、`dist/iframes/index.html`、`dist/iframes/<slug>/index.html`、`dist/tools/<slug>/index.html`）：即使站点暂时没有回退规则，这些直达链接也能打开。工具与 Iframe 条目变化时构建会自动补齐（Iframe slug 从 `backend/app/iframes.py` 读取），无需手工维护。
 
 ## COS 文件输出配置
 
@@ -104,6 +104,7 @@ npm run build
 ```powershell
 curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/api-access
 curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/iframes
+curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/iframes/milk-frog
 curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/api/v1/iframes/milk-frog/embed
 curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/tools/json
 curl.exe -s -o NUL -w "%{http_code}`n" https://superbox.fiacloud.top/api/v1/health

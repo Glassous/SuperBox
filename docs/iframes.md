@@ -28,6 +28,7 @@ curl 'http://localhost:8087/api/v1/iframes?q=奶蛙'
       "keywords": ["奶蛙", "图片", "milk frog", "iframe"],
       "content_type": "image",
       "content_url": "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",
+      "preview_url": "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",
       "thumbnail_url": "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",
       "embed_path": "/api/v1/iframes/milk-frog/embed",
       "embed_url": "https://superbox.fiacloud.top/api/v1/iframes/milk-frog/embed",
@@ -70,7 +71,9 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 <iframe src="https://superbox.fiacloud.top/api/v1/iframes/milk-frog/embed" title="奶蛙" width="640" height="640" loading="lazy" sandbox="" style="border:0;max-width:100%"></iframe>
 ```
 
-`sandbox=""` 表示不允许脚本，适合纯图片条目；网页类型条目按元数据返回的 `sandbox`、`allow` 填写。网页 `/iframes` 的预览面板可以复制以上代码、打开嵌入页或复制嵌入地址。
+`sandbox=""` 表示不允许脚本，适合纯图片条目；网页类型条目按元数据返回的 `sandbox`、`allow` 填写。网页 `/iframes` 列出全部条目，点击卡片以共享元素翻转过渡进入 `/iframes/{slug}` 详情页；详情页的大卡片预览可以复制以上代码、打开嵌入页或复制嵌入地址。
+
+详情页的大卡片先渲染 `preview_url`，再让实际内容覆盖其上：`image` 条目直接用同一张预览图作为实际效果，不再额外请求嵌入页；`page` 条目在预览图上淡入实时嵌入页。往返详情页时，翻转动画直接复用列表卡片里已经加载的预览图元素，不会重新请求图片。
 
 ## 字段说明
 
@@ -83,7 +86,8 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 | `keywords` | 搜索关键词 |
 | `content_type` | `image` 或 `page` |
 | `content_url` | 原始图片或网页地址 |
-| `thumbnail_url` | 缩略图地址；无 `poster` 的图片条目复用 `content_url`，网页条目为空字符串 |
+| `preview_url` | 预览图地址，供网页详情页的大卡片预览与卡片翻转过渡使用；图片条目默认复用 `content_url`，网页条目取条目声明的预览截图，未声明时为空字符串 |
+| `thumbnail_url` | 列表缩略图地址，当前与 `preview_url` 同源；无预览图的条目为空字符串 |
 | `embed_path` | 嵌入页的站内路径 |
 | `embed_url` | 嵌入页绝对地址，由 API 基础地址与 `embed_path` 拼接 |
 | `width`、`height` | 推荐嵌入尺寸，不是原始像素尺寸 |
@@ -99,7 +103,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 
 ## 新增 Iframe 条目
 
-1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`poster`、`width`、`height`、`sandbox`、`allow`。
+1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`preview_url`、`width`、`height`、`sandbox`、`allow`。`preview_url` 可留空：`image` 条目自动复用 `content_url`，`page` 条目留空则列表显示占位图。
 2. 在 `backend/tests/test_iframes.py` 补充目录、搜索、详情与嵌入页断言；如条目数变化，同步 `backend/tests/test_api.py` 中的 Skill 接口总数。
-3. 需要条目级文档时在本目录新增说明；网页 `/iframes` 会自动展示目录，无需改动前端代码。
+3. 需要条目级文档时在本目录新增说明；网页 `/iframes` 与 `/iframes/{slug}` 会自动展示目录与详情，无需改动前端代码。构建脚本会从 `IFRAMES` 读取 slug 生成对应的静态路由入口。
 4. 图片地址直接引用外部图床；若图床限制防盗链，需要改为服务端代理或转存 COS。

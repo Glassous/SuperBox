@@ -37,6 +37,7 @@ IFRAME_RESPONSE_EXAMPLE = (
     '"keywords":["奶蛙","图片","milk frog","iframe"],'
     '"content_type":"image",'
     '"content_url":"https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",'
+    '"preview_url":"https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",'
     '"thumbnail_url":"https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png",'
     '"embed_path":"/api/v1/iframes/milk-frog/embed",'
     '"embed_url":"$BASE/api/v1/iframes/milk-frog/embed",'

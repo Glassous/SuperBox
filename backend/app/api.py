@@ -133,6 +133,7 @@ def _iframe_metadata(item: iframes.IframeItem, request: Request) -> dict:
         "keywords": item["keywords"],
         "content_type": item["content_type"],
         "content_url": item["content_url"],
+        "preview_url": iframes.preview(item),
         "thumbnail_url": iframes.thumbnail(item),
         "embed_path": iframes.embed_path(item["slug"]),
         "embed_url": iframes.embed_url(base, item["slug"]),
