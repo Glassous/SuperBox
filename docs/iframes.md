@@ -74,9 +74,9 @@ curl http://localhost:8087/api/v1/iframes/milk-frog
 `GET /api/v1/iframes/{slug}/embed`，返回可直接作为 `iframe src` 的完整 HTML（`text/html; charset=utf-8`）。
 
 - `image` 类型渲染全屏 `<img>`，使用 `object-fit: contain` 居中显示；浅色背景为 `#f6f8fc`，`prefers-color-scheme: dark` 时为 `#0c1020`。
-- `page` 类型渲染嵌套 `<iframe>`，按条目的 `sandbox` 与 `allow` 输出。
+- `page` 类型渲染嵌套 `<iframe>`，按条目的 `sandbox` 与 `allow` 输出，并附加一段脚本把父页面与挂件页之间的 `postMessage` 互相转发；嵌入页的查询串会原样透传给挂件页（如 `?action=2&chrome=0`）。
 - 响应头包含 `Cache-Control: public, max-age=300` 与按内容类型生成的 CSP；不设置 `X-Frame-Options`，允许被任意站点嵌入。
-- 图片页 CSP 为 `default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`；网页页把 `img-src` 换成 `frame-src https: http:`。
+- 图片页 CSP 为 `default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`；网页页把 `img-src` 换成 `frame-src https: http:`，并增加 `script-src 'unsafe-inline'` 供消息转发脚本使用。
 - 未知 slug 返回统一的 JSON 404，而不是 HTML。
 
 ```bash
@@ -144,3 +144,56 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 - 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
 - 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
 - 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。
+
+## 控制三段动作（接入方）
+
+挂件支持两种控制方式，可组合使用：URL 参数决定“进来时播什么”，`postMessage` 用于宿主页面在运行时切换。
+
+### URL 参数
+
+`/widgets/penguin` 与 `/api/v1/iframes/penguin/embed` 都支持以下参数，嵌入页会把查询串原样透传给挂件页：
+
+| 参数 | 取值 | 说明 |
+| --- | --- | --- |
+| `action` | `1` / `2` / `3` | 模型加载完成后播放对应动作，不传则保持静态 |
+| `autoplay` | `0` | 配合 `action` 使用：设为 `0` 时只记录初始动作，等宿主发指令再播放 |
+| `chrome` | `0` | 隐藏挂件自带的标题栏与动作按钮，由宿主页面提供控制 UI |
+
+```html
+<iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed?action=2&chrome=0"
+  title="凑企鹅" width="800" height="800" loading="lazy"
+  sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%"></iframe>
+```
+
+也可以直接使用挂件页：`https://superbox.fiacloud.top/widgets/penguin?action=3`。
+
+### postMessage
+
+宿主向 iframe 发送指令：
+
+```js
+const frame = document.querySelector('iframe')
+frame.contentWindow.postMessage(
+  { type: 'superbox:penguin', action: 2 },
+  'https://superbox.fiacloud.top',
+)
+// action：1 | 2 | 3 播放对应动作，0 或 'stop' 回到静态
+```
+
+挂件回传加载完成与状态变化：
+
+```js
+window.addEventListener('message', event => {
+  if (event.data?.type === 'superbox:penguin:ready') {
+    // 模型已就绪，可以下发第一条指令
+  }
+  if (event.data?.type === 'superbox:penguin:state') {
+    console.log(event.data.action) // 0 表示静态，1/2/3 对应动作
+  }
+})
+```
+
+- 使用 `embed_url` 接入时，嵌入页负责在父页面与挂件页之间转发消息，宿主不需要拿到内层 iframe 的 `contentWindow`。
+- 挂件只处理来自父窗口的消息；嵌入页只转发来自父页面或内层挂件页的消息。
+- 宿主 iframe 的 `sandbox` 必须包含 `allow-scripts`（消息转发与 three.js 都依赖脚本）；`allow-same-origin` 仍是加载模型所必需。
+- 目标来源建议写成站点域名而非 `'*'`；`chrome=0` 时请确保宿主自己提供动作切换入口。

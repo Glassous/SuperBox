@@ -102,3 +102,19 @@ def test_penguin_iframe_embeds_widget_page():
         f'<iframe src="{PENGUIN_WIDGET_URL}" title="凑企鹅" loading="lazy" '
         'sandbox="allow-scripts allow-same-origin">'
     ) in response.text
+    assert "script-src 'unsafe-inline'" in response.headers["content-security-policy"]
+    assert "postMessage" in response.text
+
+
+def test_penguin_embed_passes_widget_control_query():
+    response = client.get(f"{API}/iframes/penguin/embed?action=2&chrome=0")
+    assert response.status_code == 200
+    assert (
+        f'<iframe src="{PENGUIN_WIDGET_URL}?action=2&amp;chrome=0"'
+        in response.text
+    )
+
+    image = client.get(f"{API}/iframes/milk-frog/embed?action=2")
+    assert image.status_code == 200
+    assert f'<img src="{IMAGE_URL}" alt="奶蛙">' in image.text
+    assert "postMessage" not in image.text

@@ -8,6 +8,21 @@ import type { PenguinStage } from '../three/penguinScene'
 const ACTIONS = PENGUIN_ACTIONS
 // 模型托管在 COS，桶已允许本站与本地开发来源跨域读取，避免把 5MB 资源打进前端构建。
 const MODEL_URL = 'https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.glb'
+const MESSAGE_TYPE = 'superbox:penguin'
+
+// 接入方可用 ?action=1|2|3 指定初始动作，autoplay=0 保持静态，chrome=0 隐藏自身控件。
+const search = new URLSearchParams(window.location.search)
+const minimal = search.get('chrome') === '0'
+
+function parseAction(value: unknown): 0 | 1 | 2 | null {
+  if (value === 1 || value === '1') return 0
+  if (value === 2 || value === '2') return 1
+  if (value === 3 || value === '3') return 2
+  return null
+}
+
+const initialAction = parseAction(search.get('action'))
+const autoplay = search.get('autoplay') !== '0'
 
 const host = ref<HTMLElement | null>(null)
 const status = ref<'loading' | 'ready' | 'error'>('loading')
@@ -20,6 +35,7 @@ const standalone = window.self === window.top
 
 let stage: PenguinStage | null = null
 let hintTimer: ReturnType<typeof setTimeout> | undefined
+let pendingAction: 0 | 1 | 2 | null = null
 
 const progress = computed(() => {
   if (!totalBytes.value) return 0
@@ -63,7 +79,12 @@ function mountStage() {
       loadedBytes.value = loaded
       totalBytes.value = total
     },
-    onReady: () => { status.value = 'ready' },
+    onReady: () => {
+      status.value = 'ready'
+      notifyParent({ type: 'superbox:penguin:ready' })
+      const next = pendingAction ?? (autoplay ? initialAction : null)
+      if (next !== null) setAction(next)
+    },
     onError: message => {
       status.value = 'error'
       error.value = message
@@ -75,16 +96,45 @@ function retry() {
   mountStage()
 }
 
-function toggle(index: 0 | 1 | 2) {
-  if (!stage || status.value !== 'ready') return
-  if (active.value === index) {
-    stage.stop()
-    active.value = null
+function setAction(index: 0 | 1 | 2 | null) {
+  if (!stage || status.value !== 'ready') {
+    pendingAction = index
     return
   }
-  stage.play(index)
+  if (index === null) {
+    stage.stop()
+  } else {
+    stage.play(index)
+    dismissHint()
+  }
   active.value = index
-  dismissHint()
+  notifyParent({
+    type: 'superbox:penguin:state',
+    action: index === null ? 0 : ((index + 1) as 1 | 2 | 3),
+  })
+}
+
+function toggle(index: 0 | 1 | 2) {
+  setAction(active.value === index ? null : index)
+}
+
+function notifyParent(payload: { type: string; action?: 0 | 1 | 2 | 3 }) {
+  if (window.parent === window) return
+  window.parent.postMessage(payload, '*')
+}
+
+/** 接入方通过 postMessage 控制：{ type: 'superbox:penguin', action: 1|2|3|0 }。 */
+function onMessage(event: MessageEvent) {
+  if (event.source !== window.parent) return
+  const data = event.data as { type?: unknown; action?: unknown } | null
+  if (!data || data.type !== MESSAGE_TYPE) return
+  if (data.action === undefined) return
+  if (data.action === null || data.action === 'stop' || data.action === 0 || data.action === '0') {
+    setAction(null)
+    return
+  }
+  const index = parseAction(data.action)
+  if (index !== null) setAction(index)
 }
 
 function dismissHint() {
@@ -94,10 +144,12 @@ function dismissHint() {
 
 onMounted(() => {
   mountStage()
+  window.addEventListener('message', onMessage)
   hintTimer = setTimeout(() => { hintVisible.value = false }, 7000)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('message', onMessage)
   if (hintTimer) clearTimeout(hintTimer)
   teardown()
 })
@@ -115,7 +167,7 @@ onBeforeUnmount(() => {
       <div class="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#070b17] to-transparent"></div>
     </div>
 
-    <header class="relative z-10 flex items-start justify-between gap-4 px-5 pt-5 sm:px-7 sm:pt-6">
+    <header v-if="!minimal" class="relative z-10 flex items-start justify-between gap-4 px-5 pt-5 sm:px-7 sm:pt-6">
       <div class="min-w-0">
         <span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/25 bg-indigo-500/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.22em] text-indigo-300">SUPERBOX · 3D 互动</span>
         <h1 class="mt-2 text-[22px] font-bold leading-tight tracking-tight text-white sm:text-2xl">凑企鹅</h1>
@@ -135,6 +187,7 @@ onBeforeUnmount(() => {
       <div ref="host" class="absolute inset-0 cursor-grab active:cursor-grabbing" @pointerdown="dismissHint"></div>
 
       <div
+        v-if="!minimal"
         class="pointer-events-none absolute left-4 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/50 px-3 py-1.5 text-[11px] font-medium text-slate-300 backdrop-blur transition-opacity duration-500 sm:left-7"
         :class="hintVisible ? 'opacity-100' : 'opacity-0'"
       >
@@ -178,7 +231,7 @@ onBeforeUnmount(() => {
       </div>
     </main>
 
-    <footer class="relative z-10 px-4 pb-4 pt-2 sm:px-7 sm:pb-6">
+    <footer v-if="!minimal" class="relative z-10 px-4 pb-4 pt-2 sm:px-7 sm:pb-6">
       <div class="mx-auto w-full max-w-2xl">
         <div class="flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 backdrop-blur-xl min-[420px]:flex-row">
           <button

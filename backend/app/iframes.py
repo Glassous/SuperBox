@@ -25,8 +25,25 @@ IMAGE_CSP = (
     "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
 )
 PAGE_CSP = (
-    "default-src 'none'; frame-src https: http:; "
+    "default-src 'none'; frame-src https: http:; script-src 'unsafe-inline'; "
     "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+)
+
+# 网页条目多一层嵌入页，这里把控制消息在父页面与挂件页之间透传一次。
+MESSAGE_RELAY = (
+    "<script>\n"
+    "  (function () {\n"
+    "    var frame = document.querySelector('iframe');\n"
+    "    window.addEventListener('message', function (event) {\n"
+    "      if (!frame || !frame.contentWindow) return;\n"
+    "      if (event.source === window.parent) {\n"
+    "        frame.contentWindow.postMessage(event.data, '*');\n"
+    "      } else if (event.source === frame.contentWindow) {\n"
+    "        window.parent.postMessage(event.data, '*');\n"
+    "      }\n"
+    "    });\n"
+    "  })();\n"
+    "</script>"
 )
 
 
@@ -120,9 +137,17 @@ def content_security_policy(item: IframeItem) -> str:
     return IMAGE_CSP if item["content_type"] == "image" else PAGE_CSP
 
 
-def _iframe_attributes(item: IframeItem) -> str:
+def _embed_src(item: IframeItem, query: str) -> str:
+    """把嵌入页的查询串透传给挂件页，例如 ?action=2&chrome=0。"""
+    if not query:
+        return item["content_url"]
+    separator = "&" if "?" in item["content_url"] else "?"
+    return f'{item["content_url"]}{separator}{query}'
+
+
+def _iframe_attributes(item: IframeItem, src: str) -> str:
     attributes = [
-        f'src="{escape(item["content_url"], quote=True)}"',
+        f'src="{escape(src, quote=True)}"',
         f'title="{escape(item["name"])}"',
         'loading="lazy"',
         f'sandbox="{escape(item["sandbox"], quote=True)}"',
@@ -132,14 +157,16 @@ def _iframe_attributes(item: IframeItem) -> str:
     return " ".join(attributes)
 
 
-def render_embed(item: IframeItem) -> str:
+def render_embed(item: IframeItem, query: str = "") -> str:
     title = escape(item["name"])
+    relay = ""
     if item["content_type"] == "image":
         media = (
             f'<img src="{escape(item["content_url"], quote=True)}" alt="{title}">'
         )
     else:
-        media = f"<iframe {_iframe_attributes(item)}></iframe>"
+        media = f"<iframe {_iframe_attributes(item, _embed_src(item, query))}></iframe>"
+        relay = MESSAGE_RELAY + "\n"
     return (
         "<!doctype html>\n"
         '<html lang="zh-CN">\n'
@@ -159,6 +186,7 @@ def render_embed(item: IframeItem) -> str:
         "</head>\n"
         "<body>\n"
         f"{media}\n"
+        f"{relay}"
         "</body>\n"
         "</html>\n"
     )

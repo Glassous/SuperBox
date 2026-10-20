@@ -169,12 +169,12 @@ def get_iframe(slug: str, request: Request) -> dict:
     responses={200: {"content": {"text/html": {}}}},
     tags=["Iframes"],
 )
-def get_iframe_embed(slug: str) -> Response:
+def get_iframe_embed(slug: str, request: Request) -> Response:
     item = iframes.find(slug)
     if item is None:
         raise HTTPException(status_code=404, detail="Iframe 不存在")
     return Response(
-        content=iframes.render_embed(item),
+        content=iframes.render_embed(item, request.url.query),
         media_type="text/html",
         headers={
             "Cache-Control": iframes.EMBED_CACHE_CONTROL,
