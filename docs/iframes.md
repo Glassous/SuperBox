@@ -7,6 +7,7 @@ Iframe 仓库提供可直接嵌入任意网页的挂件。后端维护条目目�
 | slug | 名称 | 分类 | 内容类型 | 推荐尺寸 |
 | --- | --- | --- | --- | --- |
 | `milk-frog` | 奶蛙 | 图片展示 | `image` | 640 × 640 |
+| `penguin` | 凑企鹅 | 3D 互动 | `page` | 800 × 800 |
 
 ## 目录与搜索
 
@@ -36,10 +37,29 @@ curl 'http://localhost:8087/api/v1/iframes?q=奶蛙'
       "height": 640,
       "sandbox": "",
       "allow": ""
+    },
+    {
+      "slug": "penguin",
+      "name": "凑企鹅",
+      "category": "3D 互动",
+      "description": "基于 three.js 的凑企鹅 3D 挂件，可切换三段动作并拖拽旋转视角。",
+      "keywords": ["凑企鹅", "企鹅", "3d", "three.js", "模型", "penguin", "iframe"],
+      "content_type": "page",
+      "content_url": "https://superbox.fiacloud.top/widgets/penguin",
+      "preview_url": "https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.png",
+      "thumbnail_url": "https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.png",
+      "embed_path": "/api/v1/iframes/penguin/embed",
+      "embed_url": "https://superbox.fiacloud.top/api/v1/iframes/penguin/embed",
+      "width": 800,
+      "height": 800,
+      "sandbox": "allow-scripts allow-same-origin",
+      "allow": ""
     }
   ]
 }
 ```
+
+`page` 条目的 `content_url` 必须写绝对地址，嵌入页会把它作为嵌套 iframe 的 `src`；`sandbox` 需要允许脚本，否则挂件无法运行。3D 挂件的 `sandbox` 为 `allow-scripts allow-same-origin`：缺少 `allow-same-origin` 时 iframe 变为不透明源，同源加载模型文件会被按跨域请求拒绝。
 
 ## 详情
 
@@ -71,22 +91,28 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 <iframe src="https://superbox.fiacloud.top/api/v1/iframes/milk-frog/embed" title="奶蛙" width="640" height="640" loading="lazy" sandbox="" style="border:0;max-width:100%"></iframe>
 ```
 
-`sandbox=""` 表示不允许脚本，适合纯图片条目；网页类型条目按元数据返回的 `sandbox`、`allow` 填写。网页 `/iframes` 列出全部条目，点击卡片以共享元素翻转过渡进入 `/iframes/{slug}` 详情页；详情页的大卡片预览可以复制以上代码、打开嵌入页或复制嵌入地址。
+`sandbox=""` 表示不允许脚本，适合纯图片条目；网页类型条目按元数据返回的 `sandbox`、`allow` 填写。网页 `/iframes` 列出全部条目，点击卡片会从原位放大成居中对话框，URL 保持不变；弹窗默认只展示预览图，点击播放按钮后才加载实时预览，随后可以复制嵌入代码、打开嵌入页或复制嵌入地址，点击遮罩、关闭按钮或按 `Esc` 收回列表。
 
-详情页的大卡片先渲染 `preview_url`，再让实际内容覆盖其上：`image` 条目直接用同一张预览图作为实际效果，不再额外请求嵌入页；`page` 条目在预览图上淡入实时嵌入页。往返详情页时，翻转动画直接复用列表卡片里已经加载的预览图元素，不会重新请求图片。
+凑企鹅 3D 挂件的嵌入代码（脚本与同源资源都需要放行）：
+
+```html
+<iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed" title="凑企鹅" width="800" height="800" loading="lazy" sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%"></iframe>
+```
+
+弹窗的预览区与列表卡片共用同一个 `<img>` 元素：展开时图片容器直接形变到弹窗预览位置，不会发起第二次图片请求。预览框按图片原始比例与可用高度计算尺寸（高度受限、宽度随比例变化），图片完整显示不裁切。点击播放后才挂载实时 iframe：`page` 条目加载 `content_url` 页面本身（本地开发时改取同源路径，避免请求尚未部署的线上地址），`image` 条目加载后端嵌入页；关闭弹窗或点击「返回预览图」会立刻卸载 iframe，避免 3D 挂件在后台继续渲染。前端不提供 `/iframes/{slug}` 页面，条目信息只在弹窗中展示。
 
 ## 字段说明
 
 | 字段 | 说明 |
 | --- | --- |
-| `slug` | 条目标识，用于详情与嵌入页路径 |
+| `slug` | 条目标识，用于 API 详情、嵌入页路径与弹窗内标识 |
 | `name` | 展示名称，同时作为嵌入页标题 |
 | `category` | 分类文案 |
 | `description` | 简介 |
 | `keywords` | 搜索关键词 |
 | `content_type` | `image` 或 `page` |
 | `content_url` | 原始图片或网页地址 |
-| `preview_url` | 预览图地址，供网页详情页的大卡片预览与卡片翻转过渡使用；图片条目默认复用 `content_url`，网页条目取条目声明的预览截图，未声明时为空字符串 |
+| `preview_url` | 预览图地址，供列表卡片与弹窗预览使用；图片条目默认复用 `content_url`，网页条目取条目声明的预览截图，未声明时为空字符串 |
 | `thumbnail_url` | 列表缩略图地址，当前与 `preview_url` 同源；无预览图的条目为空字符串 |
 | `embed_path` | 嵌入页的站内路径 |
 | `embed_url` | 嵌入页绝对地址，由 API 基础地址与 `embed_path` 拼接 |
@@ -103,7 +129,18 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 
 ## 新增 Iframe 条目
 
-1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`preview_url`、`width`、`height`、`sandbox`、`allow`。`preview_url` 可留空：`image` 条目自动复用 `content_url`，`page` 条目留空则列表显示占位图。
+1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`preview_url`、`width`、`height`、`sandbox`、`allow`。`preview_url` 可留空：`image` 条目自动复用 `content_url`，`page` 条目留空则列表显示占位图。`page` 条目的 `content_url` 必须是绝对地址，并先完成前端页面部署。
 2. 在 `backend/tests/test_iframes.py` 补充目录、搜索、详情与嵌入页断言；如条目数变化，同步 `backend/tests/test_api.py` 中的 Skill 接口总数。
-3. 需要条目级文档时在本目录新增说明；网页 `/iframes` 与 `/iframes/{slug}` 会自动展示目录与详情，无需改动前端代码。构建脚本会从 `IFRAMES` 读取 slug 生成对应的静态路由入口。
+3. 需要条目级文档时在本目录新增说明；网页 `/iframes` 会自动展示目录与弹窗预览，无需为单个条目改动前端代码，构建脚本也不再生成条目级静态路由。
 4. 图片地址直接引用外部图床；若图床限制防盗链，需要改为服务端代理或转存 COS。
+5. 挂件页面本身是前端路由。新增挂件时在 `frontend/src/views` 创建页面、在 `frontend/src/router/index.ts` 注册路由，并把路由目录加入 `frontend/scripts/generate-spa-fallbacks.mjs` 的兜底列表，否则静态托管会 404。
+
+## 凑企鹅 3D 挂件
+
+挂件页面为前端路由 `/widgets/penguin`（`meta.bare`，不渲染站点头部），three.js 随站点构建，模型文件从 COS 加载：`https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.glb`。该地址需要桶开启 CORS 并放行站点来源与本地开发来源（`http://localhost:5173`），否则 `GLTFLoader` 的跨域读取会失败。Iframe 仓库的弹窗在点击播放后以 iframe 形式加载该页面，关闭弹窗即卸载。
+
+- 页面初始静态，点击「动作一 / 动作二 / 动作三」循环播放对应片段，再次点击当前动作回到绑定姿态。
+- 三段动作沿用模型自带片段：动作一为 `动作_bone`（第 1–63 帧）、动作二为 `咕咕嘎嘎_facial`（第 70 帧起的面部表情）、动作三为 `Action` 的第 150–1670 帧；剪辑按 30fps 换算并整体平移到 0 起播，实现在 `frontend/src/three/penguinClips.ts`。
+- 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
+- 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
+- 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。

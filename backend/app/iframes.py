@@ -14,6 +14,12 @@ EMBED_CACHE_CONTROL = "public, max-age=300"
 
 MILK_FROG_IMAGE = "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png"
 
+# 网页类型条目只能声明绝对地址，挂件页面由前端静态站点托管。
+PENGUIN_WIDGET_URL = "https://superbox.fiacloud.top/widgets/penguin"
+PENGUIN_PREVIEW = (
+    "https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.png"
+)
+
 IMAGE_CSP = (
     "default-src 'none'; img-src https: http: data:; "
     "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
@@ -53,6 +59,21 @@ IFRAMES: list[IframeItem] = [
         "width": 640,
         "height": 640,
         "sandbox": "",
+        "allow": "",
+    },
+    {
+        "slug": "penguin",
+        "name": "凑企鹅",
+        "category": "3D 互动",
+        "description": "基于 three.js 的凑企鹅 3D 挂件，可切换三段动作并拖拽旋转视角。",
+        "keywords": ["凑企鹅", "企鹅", "3d", "three.js", "模型", "penguin", "iframe"],
+        "content_type": "page",
+        "content_url": PENGUIN_WIDGET_URL,
+        "preview_url": PENGUIN_PREVIEW,
+        "width": 800,
+        "height": 800,
+        # three.js 需要执行脚本，且同源加载模型文件需要保留源身份。
+        "sandbox": "allow-scripts allow-same-origin",
         "allow": "",
     },
 ]

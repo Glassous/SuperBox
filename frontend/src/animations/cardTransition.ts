@@ -1,15 +1,15 @@
 import { gsap } from 'gsap'
-import type { IframeInfo, ToolInfo } from '../types'
+import type { ToolInfo } from '../types'
 
-export type CardKind = 'tool' | 'iframe'
-export type CardPayload = ToolInfo | IframeInfo
+export type CardKind = 'tool'
+export type CardPayload = ToolInfo
 
 type Direction = 'open' | 'return'
 type PartName = 'icon' | 'media' | 'title' | 'description' | 'category'
 
 const partNames: PartName[] = ['icon', 'media', 'title', 'description', 'category']
-const detailRoutes: Record<CardKind, string> = { tool: 'tool', iframe: 'iframe' }
-const listRoutes: Record<CardKind, string> = { tool: 'home', iframe: 'iframes' }
+const detailRoutes: Record<CardKind, string> = { tool: 'tool' }
+const listRoutes: Record<CardKind, string> = { tool: 'home' }
 
 interface FloatingPart {
   name: PartName

@@ -35,19 +35,8 @@ async function slugsFromToolView() {
   return slugs.sort()
 }
 
-// Iframe 详情页是 /iframes/<slug>，条目定义在后端目录里；只部署前端时跳过。
-async function slugsFromIframes() {
-  const path = join(root, '..', 'backend', 'app', 'iframes.py')
-  try {
-    const source = await readFile(path, 'utf8')
-    return [...source.matchAll(/"slug"\s*:\s*"([^"]+)"/g)].map(match => match[1]).sort()
-  } catch {
-    return []
-  }
-}
-
-const [fromFiles, fromView, iframeSlugs] = await Promise.all([
-  slugsFromToolFiles(), slugsFromToolView(), slugsFromIframes(),
+const [fromFiles, fromView] = await Promise.all([
+  slugsFromToolFiles(), slugsFromToolView(),
 ])
 if (fromFiles.join(',') !== fromView.join(',')) {
   throw new Error(
@@ -62,8 +51,8 @@ await access(indexPath).catch(() => {
 const routes = [
   'api-access',
   'iframes',
-  ...iframeSlugs.map(slug => `iframes/${slug}`),
   ...fromFiles.map(slug => `tools/${slug}`),
+  'widgets/penguin',
 ]
 for (const route of routes) {
   const target = join(dist, route, 'index.html')

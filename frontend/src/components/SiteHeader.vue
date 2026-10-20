@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { beginCardTransition, isPlainNavigation, type CardKind } from '../animations/cardTransition'
+import { beginCardTransition, isPlainNavigation } from '../animations/cardTransition'
 import ThemeIcon from './ThemeIcon.vue'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 
@@ -9,10 +9,9 @@ const route = useRoute()
 const { theme, themeLabels, setTheme } = useTheme()
 const themeMenuOpen = ref(false)
 const themeMenu = ref<HTMLElement | null>(null)
-const isDetail = computed(() => route.name === 'tool' || route.name === 'iframe')
-const backKind = computed<CardKind>(() => route.name === 'iframe' ? 'iframe' : 'tool')
-const backTo = computed(() => backKind.value === 'iframe' ? '/iframes' : '/')
-const backLabel = computed(() => backKind.value === 'iframe' ? '返回 Iframe 仓库' : '返回全部工具')
+const isDetail = computed(() => route.name === 'tool')
+const backTo = '/'
+const backLabel = '返回全部工具'
 
 onMounted(() => {
   document.addEventListener('pointerdown', closeThemeMenuOutside)
@@ -35,7 +34,7 @@ function beginReturn(event: MouseEvent) {
   if (!isDetail.value || !isPlainNavigation(event)) return
   const detail = document.querySelector<HTMLElement>('[data-card-transition-detail]')
   if (detail && typeof route.params.slug === 'string') {
-    beginCardTransition(backKind.value, 'return', route.params.slug, detail)
+    beginCardTransition('tool', 'return', route.params.slug, detail)
   }
 }
 </script>
