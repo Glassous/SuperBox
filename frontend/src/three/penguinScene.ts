@@ -7,23 +7,22 @@ import {
   DirectionalLight,
   Group,
   HemisphereLight,
-  LoopRepeat,
+  LoopOnce,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
   PMREMGenerator,
   SRGBColorSpace,
   Scene,
-  SkinnedMesh,
   Timer,
   Vector3,
   WebGLRenderer,
 } from 'three'
-import type { AnimationAction, AnimationClip, Object3D } from 'three'
+import type { AnimationAction, AnimationClip, Bone, Object3D, Quaternion } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { buildPenguinClips } from './penguinClips'
+import { PENGUIN_ACTIONS, resolvePenguinClip } from './penguinClips'
 import { createGlowTexture, disposeObject, framePenguinCamera, noopStage } from './penguinAssets'
 import type { PenguinStage, PenguinStageHandlers } from './penguinAssets'
 
@@ -102,12 +101,11 @@ export function createPenguinStage(
   glow.rotation.x = -Math.PI / 2
   glow.visible = false
   root.add(glow)
-
   let mixer: AnimationMixer | null = null
-  let actions: AnimationAction[] = []
+  let action: AnimationAction | null = null
   let model: Object3D | null = null
-  let skinnedMeshes: SkinnedMesh[] = []
-  let morphMeshes: Mesh[] = []
+  let restPose: { bone: Bone; position: Vector3; quaternion: Quaternion; scale: Vector3 }[] = []
+  let activeIndex = -1
   let playing = false
   let frame = 0
   let running = false
@@ -124,7 +122,6 @@ export function createPenguinStage(
     camera.updateProjectionMatrix()
     needsRender = true
   }
-
   function tick(): void {
     if (disposed) return
     frame = requestAnimationFrame(tick)
@@ -132,6 +129,8 @@ export function createPenguinStage(
     const delta = Math.min(timer.getDelta(), 0.05)
     if (playing && mixer) {
       mixer.update(delta)
+      const segment = activeIndex >= 0 ? PENGUIN_ACTIONS[activeIndex] : undefined
+      if (action && segment && action.time >= segment.end - 1e-4) finishSegment()
       needsRender = true
     }
     controls.update()
@@ -147,25 +146,26 @@ export function createPenguinStage(
     timer.update()
     frame = requestAnimationFrame(tick)
   }
-
   function stopLoop(): void {
     if (!running) return
     running = false
     cancelAnimationFrame(frame)
   }
-
   function setupModel(source: Object3D, clips: AnimationClip[]): void {
     model = source
-    skinnedMeshes = []
-    morphMeshes = []
+    const bones: Bone[] = []
 
     source.traverse(child => {
       const mesh = child as Mesh
-      if (!mesh.isMesh) return
-      mesh.frustumCulled = false
-      if ((mesh as SkinnedMesh).isSkinnedMesh) skinnedMeshes.push(mesh as SkinnedMesh)
-      if (mesh.morphTargetInfluences?.length) morphMeshes.push(mesh)
+      if (mesh.isMesh) mesh.frustumCulled = false
+      if ((child as Bone).isBone) bones.push(child as Bone)
     })
+    restPose = bones.map(bone => ({
+      bone,
+      position: bone.position.clone(),
+      quaternion: bone.quaternion.clone(),
+      scale: bone.scale.clone(),
+    }))
 
     root.add(source)
     const bounds = new Box3().setFromObject(source)
@@ -179,12 +179,8 @@ export function createPenguinStage(
     glow.visible = true
 
     mixer = new AnimationMixer(source)
-    actions = buildPenguinClips(clips).map(clip => {
-      const action = mixer!.clipAction(clip)
-      action.setLoop(LoopRepeat, Number.POSITIVE_INFINITY)
-      action.clampWhenFinished = false
-      return action
-    })
+    action = mixer.clipAction(resolvePenguinClip(clips))
+    action.clampWhenFinished = true
 
     resize()
     framePenguinCamera(camera, controls, radius)
@@ -223,37 +219,41 @@ export function createPenguinStage(
     )
   }
 
+  /** 与 GlLab 的 v1.0 处理一致：定位到片段起点、只播一次，播完回到绑定姿态。 */
   function play(index: 0 | 1 | 2): void {
-    if (!mixer) return
-    const next = actions[index]
-    if (!next) return
-    for (const action of actions) {
-      if (action !== next && action.isRunning()) action.fadeOut(0.18)
-    }
-    next.reset()
-    next.setEffectiveTimeScale(1)
-    next.setEffectiveWeight(1)
-    next.fadeIn(0.18)
-    next.play()
-    // 表情片段只驱动 morph 轨道，切换回骨骼动作时需要把表情复位。
-    if (index !== 1) {
-      for (const mesh of morphMeshes) mesh.morphTargetInfluences?.fill(0)
-    }
+    const segment = PENGUIN_ACTIONS[index]
+    if (!mixer || !action || !segment) return
+    action.stop()
+    action.reset()
+    action.setLoop(LoopOnce, 1)
+    action.clampWhenFinished = true
+    action.play()
+    action.time = segment.start
+    mixer.update(0)
+    activeIndex = index
     playing = true
     needsRender = true
     startLoop()
   }
-
-  function stop(): void {
-    if (!mixer) return
-    mixer.stopAllAction()
-    mixer.setTime(0)
-    for (const skinned of skinnedMeshes) skinned.skeleton.pose()
-    for (const mesh of morphMeshes) mesh.morphTargetInfluences?.fill(0)
-    playing = false
-    needsRender = true
+  function resetPose(): void {
+    for (const pose of restPose) {
+      pose.bone.position.copy(pose.position)
+      pose.bone.quaternion.copy(pose.quaternion)
+      pose.bone.scale.copy(pose.scale)
+    }
   }
-
+  function finishSegment(): void {
+    if (!playing) return
+    action?.stop()
+    resetPose()
+    playing = false
+    activeIndex = -1
+    needsRender = true
+    handlers.onSegmentEnd?.()
+  }
+  function stop(): void {
+    finishSegment()
+  }
   function dispose(): void {
     if (disposed) return
     disposed = true

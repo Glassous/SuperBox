@@ -12,6 +12,8 @@ export interface PenguinStageHandlers {
   onProgress: (loaded: number, total: number) => void
   onReady: () => void
   onError: (message: string) => void
+  /** 当前片段播放到区间末尾并回到静止姿态后触发。 */
+  onSegmentEnd?: () => void
 }
 
 export interface PenguinStage {

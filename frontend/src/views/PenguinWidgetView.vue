@@ -51,8 +51,8 @@ const activeLabel = computed(() => (active.value === null ? '' : ACTIONS[active.
 const statusText = computed(() => {
   if (status.value === 'loading') return '模型准备中…'
   if (status.value === 'error') return '加载失败，请重试'
-  if (active.value === null) return '当前为静态姿态，点击动作按钮开始播放'
-  return `${activeLabel.value}循环播放中 · 再次点击回到静态`
+  if (active.value === null) return '当前为静态姿态，点击动作按钮播放对应片段'
+  return `${activeLabel.value}播放中 · 播完自动回到静态`
 })
 
 function formatBytes(bytes: number): string {
@@ -88,6 +88,10 @@ function mountStage() {
     onError: message => {
       status.value = 'error'
       error.value = message
+    },
+    onSegmentEnd: () => {
+      active.value = null
+      notifyParent({ type: 'superbox:penguin:state', action: 0 })
     },
   })
 }
@@ -250,7 +254,7 @@ onBeforeUnmount(() => {
               <span class="font-mono text-[10px]" :class="active === action.index ? 'text-white/70' : 'text-slate-500'">{{ action.frames }}</span>
             </span>
             <span class="mt-0.5 block text-[11px]" :class="active === action.index ? 'text-white/75' : 'text-slate-500'">
-              {{ active === action.index ? '再次点击回到静态' : action.hint }}
+              {{ active === action.index ? '播放中，点击可中断' : action.hint }}
             </span>
           </button>
         </div>

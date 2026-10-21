@@ -139,8 +139,8 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 
 挂件页面为前端路由 `/widgets/penguin`（`meta.bare`，不渲染站点头部），three.js 随站点构建，模型文件从 COS 加载：`https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.glb`。该地址需要桶开启 CORS 并放行站点来源与本地开发来源（`http://localhost:5173`），否则 `GLTFLoader` 的跨域读取会失败。Iframe 仓库的弹窗在点击播放后以 iframe 形式加载该页面，关闭弹窗即卸载。
 
-- 页面初始静态，点击「动作一 / 动作二 / 动作三」循环播放对应片段，再次点击当前动作回到绑定姿态。
-- 三段动作沿用模型自带片段：动作一为 `动作_bone`（第 1–63 帧）、动作二为 `咕咕嘎嘎_facial`（第 70 帧起的面部表情）、动作三为 `Action` 的第 150–1670 帧；剪辑按 30fps 换算并整体平移到 0 起播，实现在 `frontend/src/three/penguinClips.ts`。
+- 页面初始静态，点击「动作一 / 动作二 / 动作三」只播放对应片段：播到区间末尾后停止并回到绑定姿态；播放中再次点击当前动作可提前中断。
+- 三段动作共用模型里 `Action` 这一条时间轴（总长 55.67s / 1671 帧 / 30fps），按帧区间定位播放：动作一第 1–63 帧、动作二第 70–149 帧、动作三第 150–1670 帧。实现方式与 `GlLab/web` 的 `loadGlbModel` 一致：`action.time = (起始帧 - 1) / 30`，`LoopOnce` + `clampWhenFinished`，`action.time` 到达 `(结束帧 - 1) / 30` 时停止并恢复骨骼绑定姿态，代码在 `frontend/src/three/penguinClips.ts` 与 `penguinScene.ts`。
 - 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
 - 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
 - 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。
@@ -155,7 +155,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 
 | 参数 | 取值 | 说明 |
 | --- | --- | --- |
-| `action` | `1` / `2` / `3` | 模型加载完成后播放对应动作，不传则保持静态 |
+| `action` | `1` / `2` / `3` | 模型加载完成后播放对应片段（只播一次，结束回到静态），不传则保持静态 |
 | `autoplay` | `0` | 配合 `action` 使用：设为 `0` 时只记录初始动作，等宿主发指令再播放 |
 | `chrome` | `0` | 隐藏挂件自带的标题栏与动作按钮，由宿主页面提供控制 UI |
 
@@ -177,7 +177,7 @@ frame.contentWindow.postMessage(
   { type: 'superbox:penguin', action: 2 },
   'https://superbox.fiacloud.top',
 )
-// action：1 | 2 | 3 播放对应动作，0 或 'stop' 回到静态
+// action：1 | 2 | 3 播放对应片段（播完自动回到静态），0 或 'stop' 立即中断
 ```
 
 挂件回传加载完成与状态变化：
