@@ -97,7 +97,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 凑企鹅 3D 挂件的嵌入代码（脚本与同源资源都需要放行）：
 
 ```html
-<iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed" title="凑企鹅" width="800" height="800" loading="lazy" sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%"></iframe>
+<iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed" title="凑企鹅" width="800" height="800" loading="lazy" sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%;background:transparent"></iframe>
 ```
 
 弹窗的预览区与列表卡片共用同一个 `<img>` 元素：展开时图片容器直接形变到弹窗预览位置，不会发起第二次图片请求。预览框按图片原始比例与可用高度计算尺寸（高度受限、宽度随比例变化），图片完整显示不裁切。点击播放后才挂载实时 iframe：`page` 条目加载 `content_url` 页面本身（本地开发时改取同源路径，避免请求尚未部署的线上地址），`image` 条目加载后端嵌入页；关闭弹窗或点击「返回预览图」会立刻卸载 iframe，避免 3D 挂件在后台继续渲染。前端不提供 `/iframes/{slug}` 页面，条目信息只在弹窗中展示。
@@ -143,7 +143,8 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 - 页面初始静态，点击「动作一 / 动作二 / 动作三」只播放对应片段：播到区间末尾后停止并回到绑定姿态；播放中再次点击当前动作可提前中断。
 - 三段动作共用模型里 `Action` 这一条时间轴（总长 55.67s / 1671 帧 / 30fps），按帧区间定位播放：动作一第 1–63 帧、动作二第 70–149 帧、动作三第 150–1670 帧。实现方式与 `GlLab/web` 的 `loadGlbModel` 一致：`action.time = (起始帧 - 1) / 30`，`LoopOnce` + `clampWhenFinished`，`action.time` 到达 `(结束帧 - 1) / 30` 时停止并恢复骨骼绑定姿态，代码在 `frontend/src/three/penguinClips.ts` 与 `penguinScene.ts`。
 - 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
-- 页面背景透明、无舞台底色与边框；相机按模型包围盒的四边贴满取景框（留 4% 边距），企鹅占据绝大部分画布。直接访问或站内弹窗预览时保留三段动作的小胶囊按钮；通过嵌入页对外提供时默认追加 `chrome=0`，宿主只会看到模型本身，底色完全透出宿主页面。
+- 页面背景透明、无舞台底色与边框；相机按模型包围盒取景并在四周留出约 1/8 的边距，企鹅占据画面主体但不贴边。直接访问或站内弹窗预览时保留三段动作的小胶囊按钮；通过嵌入页对外提供时默认追加 `chrome=0`，宿主只会看到模型本身，底色完全透出宿主页面。
+- `html`、`body`、挂件根节点与 WebGL 画布都不设置背景色，宿主页面是什么底色就显示什么底色；嵌入代码里的 `style` 也带了 `background:transparent`，避免宿主自身的 iframe 背景规则叠加出白底。
 - Iframe 仓库弹窗在实时预览加载完成后会隐藏底层的预览截图，避免透明挂件后面透出截图背景；点击「返回预览图」后恢复。
 - 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
 - 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。
@@ -165,7 +166,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 ```html
 <iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed?action=2&chrome=0"
   title="凑企鹅" width="800" height="800" loading="lazy"
-  sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%"></iframe>
+  sandbox="allow-scripts allow-same-origin" style="border:0;max-width:100%;background:transparent"></iframe>
 ```
 
 也可以直接使用挂件页：`https://superbox.fiacloud.top/widgets/penguin?action=3`。

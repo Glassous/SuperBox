@@ -38,7 +38,7 @@ const embedCode = computed(() => {
     `height="${value.height}"`,
     'loading="lazy"',
     `sandbox="${value.sandbox}"`,
-    'style="border:0;max-width:100%"',
+    'style="border:0;max-width:100%;background:transparent"',
   ]
   if (value.allow) attributes.push(`allow="${value.allow}"`)
   return `<iframe ${attributes.join(' ')}></iframe>`

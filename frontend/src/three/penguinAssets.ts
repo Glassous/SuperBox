@@ -40,7 +40,7 @@ export function disposeObject(object: Object3D): void {
   })
 }
 
-/** 按模型盒子尺寸贴满取景框（留 4% 边距），并限制轨道控件的缩放范围避免穿模。 */
+/** 按模型盒子尺寸取景，四周留出约 1/8 的边距，并限制轨道控件的缩放范围避免穿模。 */
 export function framePenguinCamera(camera: PerspectiveCamera, controls: OrbitControls, size: Vector3): void {
   const verticalFov = (camera.fov * Math.PI) / 180
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect)
@@ -49,7 +49,7 @@ export function framePenguinCamera(camera: PerspectiveCamera, controls: OrbitCon
   const distance = Math.max(
     halfHeight / Math.tan(verticalFov / 2),
     halfWidth / Math.tan(horizontalFov / 2),
-  ) * 1.04
+  ) * 1.18
   const direction = new Vector3(0.18, 0.12, 1).normalize()
   camera.position.copy(direction.multiplyScalar(distance))
   camera.near = Math.max(distance / 120, 0.01)
