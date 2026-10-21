@@ -142,6 +142,8 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 - 页面初始静态，点击「动作一 / 动作二 / 动作三」只播放对应片段：播到区间末尾后停止并回到绑定姿态；播放中再次点击当前动作可提前中断。
 - 三段动作共用模型里 `Action` 这一条时间轴（总长 55.67s / 1671 帧 / 30fps），按帧区间定位播放：动作一第 1–63 帧、动作二第 70–149 帧、动作三第 150–1670 帧。实现方式与 `GlLab/web` 的 `loadGlbModel` 一致：`action.time = (起始帧 - 1) / 30`，`LoopOnce` + `clampWhenFinished`，`action.time` 到达 `(结束帧 - 1) / 30` 时停止并恢复骨骼绑定姿态，代码在 `frontend/src/three/penguinClips.ts` 与 `penguinScene.ts`。
 - 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
+- 页面背景透明、无舞台底色与边框，只保留三段动作的小胶囊按钮；相机按模型包围盒的四边贴满取景框（留 4% 边距），企鹅占据绝大部分画布。被 iframe 嵌入时会直接叠在宿主页面背景上，因此宿主可自由设定底色。
+- Iframe 仓库弹窗在实时预览加载完成后会隐藏底层的预览截图，避免透明挂件后面透出截图背景；点击「返回预览图」后恢复。
 - 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
 - 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。
 
@@ -157,7 +159,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 | --- | --- | --- |
 | `action` | `1` / `2` / `3` | 模型加载完成后播放对应片段（只播一次，结束回到静态），不传则保持静态 |
 | `autoplay` | `0` | 配合 `action` 使用：设为 `0` 时只记录初始动作，等宿主发指令再播放 |
-| `chrome` | `0` | 隐藏挂件自带的标题栏与动作按钮，由宿主页面提供控制 UI |
+| `chrome` | `0` | 隐藏挂件自带的动作按钮，由宿主页面提供控制 UI |
 
 ```html
 <iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed?action=2&chrome=0"

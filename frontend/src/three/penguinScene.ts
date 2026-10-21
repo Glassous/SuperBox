@@ -1,15 +1,12 @@
 import {
   ACESFilmicToneMapping,
-  AdditiveBlending,
   AnimationMixer,
   Box3,
-  CircleGeometry,
   DirectionalLight,
   Group,
   HemisphereLight,
   LoopOnce,
   Mesh,
-  MeshBasicMaterial,
   PerspectiveCamera,
   PMREMGenerator,
   SRGBColorSpace,
@@ -23,7 +20,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { PENGUIN_ACTIONS, resolvePenguinClip } from './penguinClips'
-import { createGlowTexture, disposeObject, framePenguinCamera, noopStage } from './penguinAssets'
+import { disposeObject, framePenguinCamera, noopStage } from './penguinAssets'
 import type { PenguinStage, PenguinStageHandlers } from './penguinAssets'
 
 export type { PenguinStage, PenguinStageHandlers } from './penguinAssets'
@@ -89,18 +86,6 @@ export function createPenguinStage(
   const root = new Group()
   scene.add(root)
 
-  const glowTexture = createGlowTexture()
-  const glowMaterial = new MeshBasicMaterial({
-    map: glowTexture,
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    opacity: 0.85,
-  })
-  const glow = new Mesh(new CircleGeometry(1, 64), glowMaterial)
-  glow.rotation.x = -Math.PI / 2
-  glow.visible = false
-  root.add(glow)
   let mixer: AnimationMixer | null = null
   let action: AnimationAction | null = null
   let model: Object3D | null = null
@@ -173,17 +158,12 @@ export function createPenguinStage(
     const center = bounds.getCenter(new Vector3())
     source.position.sub(center)
 
-    const radius = Math.max(size.length() * 0.5, 0.4)
-    glow.scale.setScalar(radius * 1.7)
-    glow.position.set(0, -size.y * 0.5 - radius * 0.02, 0)
-    glow.visible = true
-
     mixer = new AnimationMixer(source)
     action = mixer.clipAction(resolvePenguinClip(clips))
     action.clampWhenFinished = true
 
     resize()
-    framePenguinCamera(camera, controls, radius)
+    framePenguinCamera(camera, controls, size)
     controls.addEventListener('change', requestRender)
     needsRender = true
     handlers.onReady()
@@ -267,7 +247,6 @@ export function createPenguinStage(
     mixer?.stopAllAction()
     if (mixer && model) mixer.uncacheRoot(model)
     disposeObject(root)
-    glowTexture.dispose()
     environment.dispose()
     renderer.dispose()
     canvas.remove()

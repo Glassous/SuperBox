@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useExpandableOverlay } from '../composables/useExpandableOverlay'
 import IframeDialogContent from './IframeDialogContent.vue'
 import type { IframeInfo } from '../types'
@@ -22,6 +22,7 @@ const previewImage = ref<HTMLImageElement | null>(null)
 const trigger = ref<HTMLButtonElement | null>(null)
 const previewFailed = ref(false)
 const previewAspect = ref(0)
+const liveVisible = ref(false)
 const titleId = `iframe-title-${props.item.slug}`
 const expandedTitleId = `${titleId}-expanded`
 const previewSrc = computed(() => props.item.preview_url || props.item.thumbnail_url)
@@ -53,6 +54,10 @@ const { phase, floating, slotHeight, open, close } = useExpandableOverlay(
 onMounted(() => {
   if (previewImage.value?.complete) onPreviewLoad()
 })
+
+watch(phase, value => {
+  if (value === 'collapsed') liveVisible.value = false
+})
 </script>
 
 <template>
@@ -74,7 +79,9 @@ onMounted(() => {
           <div
             ref="media"
             class="relative w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-white/5"
-            :class="floating ? '' : 'aspect-[16/10]'"
+            :class="floating
+              ? ['transition-opacity duration-300', liveVisible ? 'opacity-0' : 'opacity-100']
+              : 'aspect-[16/10]'"
           >
             <img
               v-if="previewSrc && !previewFailed"
@@ -121,7 +128,7 @@ onMounted(() => {
           class="absolute left-0 overflow-hidden border-t border-slate-100 opacity-0 dark:border-white/10"
           :inert="phase !== 'open'"
         >
-          <IframeDialogContent :item="item" :active="phase === 'open'" />
+          <IframeDialogContent :item="item" :active="phase === 'open'" @live-change="liveVisible = $event" />
         </div>
 
         <button

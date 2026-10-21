@@ -18,7 +18,7 @@ watch(() => route.fullPath, () => cancelTransitionOutsideRoute(route.name, route
 </script>
 
 <template>
-  <div :class="dark ? 'dark' : ''" class="min-h-screen bg-[#f6f8fc] text-slate-900 dark:bg-[#0c1020] dark:text-slate-100">
+  <div :class="[dark ? 'dark' : '', route.meta.transparent === true ? 'bg-transparent' : 'bg-[#f6f8fc] dark:bg-[#0c1020]']" class="min-h-screen text-slate-900 dark:text-slate-100">
     <div ref="transitionHost" class="pointer-events-none fixed inset-0 z-40" aria-hidden="true"></div>
     <RouterView v-if="route.meta.bare" />
     <div v-else class="min-h-screen">

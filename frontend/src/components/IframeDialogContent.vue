@@ -6,6 +6,8 @@ const props = defineProps<{
   item: IframeInfo
   active: boolean
 }>()
+// 实时预览完全接管画面后，通知卡片隐藏底层的共享预览图，避免透出截图背景。
+const emit = defineEmits<{ 'live-change': [visible: boolean] }>()
 
 const playing = ref(false)
 const liveReady = ref(false)
@@ -46,6 +48,7 @@ const embedCode = computed(() => {
 watch(() => props.active, active => {
   if (!active) stopLive()
 })
+watch(() => playing.value && liveReady.value, visible => emit('live-change', visible))
 
 function play() {
   liveReady.value = false
@@ -102,7 +105,7 @@ onBeforeUnmount(() => {
         :title="item.name"
         :sandbox="item.sandbox"
         :allow="item.allow || undefined"
-        class="absolute inset-0 z-20 h-full w-full border-0 bg-[#070b17] transition-opacity duration-500 ease-out"
+        class="absolute inset-0 z-20 h-full w-full border-0 transition-opacity duration-500 ease-out"
         :class="liveReady ? 'opacity-100' : 'opacity-0'"
         @load="onLiveLoad"
       />
