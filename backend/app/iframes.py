@@ -6,6 +6,7 @@
 
 from html import escape
 from typing import Literal, TypedDict
+from urllib.parse import parse_qsl, urlencode
 
 
 MAX_QUERY_LENGTH = 100
@@ -138,11 +139,15 @@ def content_security_policy(item: IframeItem) -> str:
 
 
 def _embed_src(item: IframeItem, query: str) -> str:
-    """把嵌入页的查询串透传给挂件页，例如 ?action=2&chrome=0。"""
-    if not query:
+    """把嵌入页的查询串透传给挂件页；对外嵌入默认收起挂件自带控件，只看模型本身。"""
+    pairs = parse_qsl(query, keep_blank_values=True)
+    if item["content_type"] == "page" and not any(key == "chrome" for key, _ in pairs):
+        pairs.append(("chrome", "0"))
+    suffix = urlencode(pairs)
+    if not suffix:
         return item["content_url"]
     separator = "&" if "?" in item["content_url"] else "?"
-    return f'{item["content_url"]}{separator}{query}'
+    return f'{item["content_url"]}{separator}{suffix}'
 
 
 def _iframe_attributes(item: IframeItem, src: str) -> str:
@@ -167,6 +172,7 @@ def render_embed(item: IframeItem, query: str = "") -> str:
     else:
         media = f"<iframe {_iframe_attributes(item, _embed_src(item, query))}></iframe>"
         relay = MESSAGE_RELAY + "\n"
+    body_tag = '<body class="surface">' if item["content_type"] == "image" else "<body>"
     return (
         "<!doctype html>\n"
         '<html lang="zh-CN">\n'
@@ -178,13 +184,14 @@ def render_embed(item: IframeItem, query: str = "") -> str:
         "<style>\n"
         ":root { color-scheme: light dark; }\n"
         "html, body { height: 100%; margin: 0; }\n"
-        "body { display: grid; place-items: center; background: #f6f8fc; }\n"
+        "body { display: grid; place-items: center; background: transparent; }\n"
+        "body.surface { background: #f6f8fc; }\n"
         "img, iframe { display: block; width: 100%; height: 100%; border: 0; "
-        "object-fit: contain; }\n"
-        "@media (prefers-color-scheme: dark) { body { background: #0c1020; } }\n"
+        "object-fit: contain; background: transparent; }\n"
+        "@media (prefers-color-scheme: dark) { body.surface { background: #0c1020; } }\n"
         "</style>\n"
         "</head>\n"
-        "<body>\n"
+        f"{body_tag}\n"
         f"{media}\n"
         f"{relay}"
         "</body>\n"

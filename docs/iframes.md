@@ -77,6 +77,7 @@ curl http://localhost:8087/api/v1/iframes/milk-frog
 - `page` 类型渲染嵌套 `<iframe>`，按条目的 `sandbox` 与 `allow` 输出，并附加一段脚本把父页面与挂件页之间的 `postMessage` 互相转发；嵌入页的查询串会原样透传给挂件页（如 `?action=2&chrome=0`）。
 - 响应头包含 `Cache-Control: public, max-age=300` 与按内容类型生成的 CSP；不设置 `X-Frame-Options`，允许被任意站点嵌入。
 - 图片页 CSP 为 `default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`；网页页把 `img-src` 换成 `frame-src https: http:`，并增加 `script-src 'unsafe-inline'` 供消息转发脚本使用。
+- 网页条目的嵌入页不绘制底色（`body` 透明、内层 iframe 也透明），宿主页面看到的就是模型本身；图片条目仍保留浅色/深色 `surface` 底色作为留白。
 - 未知 slug 返回统一的 JSON 404，而不是 HTML。
 
 ```bash
@@ -142,7 +143,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 - 页面初始静态，点击「动作一 / 动作二 / 动作三」只播放对应片段：播到区间末尾后停止并回到绑定姿态；播放中再次点击当前动作可提前中断。
 - 三段动作共用模型里 `Action` 这一条时间轴（总长 55.67s / 1671 帧 / 30fps），按帧区间定位播放：动作一第 1–63 帧、动作二第 70–149 帧、动作三第 150–1670 帧。实现方式与 `GlLab/web` 的 `loadGlbModel` 一致：`action.time = (起始帧 - 1) / 30`，`LoopOnce` + `clampWhenFinished`，`action.time` 到达 `(结束帧 - 1) / 30` 时停止并恢复骨骼绑定姿态，代码在 `frontend/src/three/penguinClips.ts` 与 `penguinScene.ts`。
 - 舞台、轨道控件、按需渲染与资源释放实现在 `frontend/src/three/penguinScene.ts`；页面不可见或离开容器视口时暂停动画帧。
-- 页面背景透明、无舞台底色与边框，只保留三段动作的小胶囊按钮；相机按模型包围盒的四边贴满取景框（留 4% 边距），企鹅占据绝大部分画布。被 iframe 嵌入时会直接叠在宿主页面背景上，因此宿主可自由设定底色。
+- 页面背景透明、无舞台底色与边框；相机按模型包围盒的四边贴满取景框（留 4% 边距），企鹅占据绝大部分画布。直接访问或站内弹窗预览时保留三段动作的小胶囊按钮；通过嵌入页对外提供时默认追加 `chrome=0`，宿主只会看到模型本身，底色完全透出宿主页面。
 - Iframe 仓库弹窗在实时预览加载完成后会隐藏底层的预览截图，避免透明挂件后面透出截图背景；点击「返回预览图」后恢复。
 - 5.2MB 模型在 800 × 800 的嵌入尺寸下首次加载较慢，页面提供进度与失败重试；建议对该 COS 对象开启浏览器长缓存（`Cache-Control`），避免每次打开重复下载。
 - 图片预览框按图片原始比例计算：高度取可用高度，宽度随比例变化；图片使用 `object-contain` 完整显示，不做裁切。
@@ -159,7 +160,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 | --- | --- | --- |
 | `action` | `1` / `2` / `3` | 模型加载完成后播放对应片段（只播一次，结束回到静态），不传则保持静态 |
 | `autoplay` | `0` | 配合 `action` 使用：设为 `0` 时只记录初始动作，等宿主发指令再播放 |
-| `chrome` | `0` | 隐藏挂件自带的动作按钮，由宿主页面提供控制 UI |
+| `chrome` | `0` / `1` | `0` 隐藏挂件自带的动作按钮，只留模型；`1` 强制显示。嵌入页默认按 `0` 处理，需要自带按钮时在嵌入地址显式加 `chrome=1` |
 
 ```html
 <iframe src="https://superbox.fiacloud.top/api/v1/iframes/penguin/embed?action=2&chrome=0"

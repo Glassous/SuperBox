@@ -62,6 +62,7 @@ def test_iframe_embed_page_is_embeddable_html():
     assert "<title>奶蛙</title>" in response.text
     assert f'<img src="{IMAGE_URL}" alt="奶蛙">' in response.text
     assert "prefers-color-scheme: dark" in response.text
+    assert '<body class="surface">' in response.text
 
     missing = client.get(f"{API}/iframes/missing/embed")
     assert missing.status_code == 404
@@ -99,9 +100,12 @@ def test_penguin_iframe_embeds_widget_page():
     assert "frame-src" in response.headers["content-security-policy"]
     assert "<title>凑企鹅</title>" in response.text
     assert (
-        f'<iframe src="{PENGUIN_WIDGET_URL}" title="凑企鹅" loading="lazy" '
+        f'<iframe src="{PENGUIN_WIDGET_URL}?chrome=0" title="凑企鹅" loading="lazy" '
         'sandbox="allow-scripts allow-same-origin">'
     ) in response.text
+    # 网页条目嵌入页保持透明，避免宿主页面出现一块底色。
+    assert "<body>" in response.text
+    assert 'class="surface"' not in response.text
     assert "script-src 'unsafe-inline'" in response.headers["content-security-policy"]
     assert "postMessage" in response.text
 
@@ -112,6 +116,12 @@ def test_penguin_embed_passes_widget_control_query():
     assert (
         f'<iframe src="{PENGUIN_WIDGET_URL}?action=2&amp;chrome=0"'
         in response.text
+    )
+
+    custom = client.get(f"{API}/iframes/penguin/embed?chrome=1&action=1")
+    assert (
+        f'<iframe src="{PENGUIN_WIDGET_URL}?chrome=1&amp;action=1"'
+        in custom.text
     )
 
     image = client.get(f"{API}/iframes/milk-frog/embed?action=2")
