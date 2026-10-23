@@ -65,8 +65,10 @@ def test_iframe_embed_page_is_embeddable_html():
     assert "img-src" in response.headers["content-security-policy"]
     assert "<title>奶蛙</title>" in response.text
     assert f'<img src="{IMAGE_URL}" alt="奶蛙">' in response.text
-    assert "prefers-color-scheme: dark" in response.text
-    assert '<body class="surface">' in response.text
+    # 奶蛙原图同样是透明 PNG，嵌入页不铺任何底色。
+    assert "<body>" in response.text
+    assert "background: transparent" in response.text
+    assert "color-scheme" not in response.text
 
     missing = client.get(f"{API}/iframes/missing/embed")
     assert missing.status_code == 404
@@ -109,7 +111,6 @@ def test_taffy_iframe_reuses_image_with_thumbnail_preview():
     assert "postMessage" not in response.text
     # 原图是透明 PNG，嵌入页不铺任何底色，也不声明 color-scheme 以免画布补黑白底。
     assert "<body>" in response.text
-    assert 'class="surface"' not in response.text
     assert "background: transparent" in response.text
     assert "color-scheme" not in response.text
     assert "prefers-color-scheme" not in response.text
@@ -151,7 +152,7 @@ def test_penguin_iframe_embeds_widget_page():
     ) in response.text
     # 网页条目嵌入页保持透明，避免宿主页面出现一块底色。
     assert "<body>" in response.text
-    assert 'class="surface"' not in response.text
+    assert "background: transparent" in response.text
     assert "script-src 'unsafe-inline'" in response.headers["content-security-policy"]
     assert "postMessage" in response.text
 
@@ -174,3 +175,13 @@ def test_penguin_embed_passes_widget_control_query():
     assert image.status_code == 200
     assert f'<img src="{IMAGE_URL}" alt="奶蛙">' in image.text
     assert "postMessage" not in image.text
+
+
+def test_every_embed_page_has_transparent_background():
+    for slug in ("milk-frog", "taffy", "penguin"):
+        text = client.get(f"{API}/iframes/{slug}/embed").text
+        assert "<body>" in text
+        assert "background: transparent" in text
+        # 不铺留白底色，也不声明 color-scheme 让浏览器按系统深浅色补底。
+        for forbidden in ("surface", "color-scheme", "#f6f8fc", "#0c1020"):
+            assert forbidden not in text, (slug, forbidden)

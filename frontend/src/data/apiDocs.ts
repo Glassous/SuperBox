@@ -299,7 +299,7 @@ export const apiDocs: ApiToolDoc[] = [
         exampleBody: { slug: 'milk-frog' },
         responseType: 'text',
         exampleResponse: '<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>奶蛙</title>\n</head>\n<body>\n<img src="https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png" alt="奶蛙">\n</body>\n</html>',
-        note: '响应类型 text/html，缓存 5 分钟；图片自适应容器，底色按条目配置（奶蛙带浅色/深色留白底色，Taffy探头完全透明）；禁止脚本与外部样式。',
+        note: '响应类型 text/html，缓存 5 分钟；图片自适应容器，嵌入页不绘制任何底色，透明图片直接透出宿主页面；禁止脚本与外部样式。',
       },
     ],
   },

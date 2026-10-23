@@ -61,8 +61,6 @@ class IframeItem(TypedDict):
     content_type: Literal["image", "page"]
     content_url: str
     preview_url: str
-    # 嵌入页底色：surface 铺一层留白底色，transparent 完全透出宿主页面。
-    background: Literal["surface", "transparent"]
     width: int
     height: int
     sandbox: str
@@ -80,7 +78,6 @@ IFRAMES: list[IframeItem] = [
         "content_url": MILK_FROG_IMAGE,
         # 图片条目没有独立的预览图，直接复用实际展示的图片。
         "preview_url": MILK_FROG_IMAGE,
-        "background": "surface",
         "width": 640,
         "height": 640,
         "sandbox": "",
@@ -96,8 +93,6 @@ IFRAMES: list[IframeItem] = [
         "content_url": TAFFY_IMAGE,
         # 与奶蛙同为纯图片条目；原图较大（1328×1904），预览走同源缩略图。
         "preview_url": TAFFY_PREVIEW,
-        # 原图为透明 PNG，嵌入页不铺任何底色，直接透出宿主页面。
-        "background": "transparent",
         # 推荐尺寸保持原图 83:119 的宽高比。
         "width": 415,
         "height": 595,
@@ -113,7 +108,6 @@ IFRAMES: list[IframeItem] = [
         "content_type": "page",
         "content_url": PENGUIN_WIDGET_URL,
         "preview_url": PENGUIN_PREVIEW,
-        "background": "transparent",
         "width": 800,
         "height": 800,
         # three.js 需要执行脚本，且同源加载模型文件需要保留源身份。
@@ -164,11 +158,6 @@ def content_security_policy(item: IframeItem) -> str:
     return IMAGE_CSP if item["content_type"] == "image" else PAGE_CSP
 
 
-def uses_surface(item: IframeItem) -> bool:
-    """只有显式声明 surface 的图片条目铺留白底色，其余条目一律完全透明。"""
-    return item["content_type"] == "image" and item["background"] == "surface"
-
-
 def _embed_src(item: IframeItem, query: str) -> str:
     """把嵌入页的查询串透传给挂件页；对外嵌入默认收起挂件自带控件，只看模型本身。"""
     pairs = parse_qsl(query, keep_blank_values=True)
@@ -194,6 +183,12 @@ def _iframe_attributes(item: IframeItem, src: str) -> str:
 
 
 def render_embed(item: IframeItem, query: str = "") -> str:
+    """渲染嵌入页。
+
+    所有条目都不绘制底色：img/iframe 与 html/body 均为透明，宿主页面是什么
+    底色就透出什么底色。也不声明 color-scheme，否则浏览器会按系统深浅色给
+    画布补一层黑底或白底，等于强行植入背景。
+    """
     title = escape(item["name"])
     relay = ""
     if item["content_type"] == "image":
@@ -203,15 +198,6 @@ def render_embed(item: IframeItem, query: str = "") -> str:
     else:
         media = f"<iframe {_iframe_attributes(item, _embed_src(item, query))}></iframe>"
         relay = MESSAGE_RELAY + "\n"
-    body_tag = '<body class="surface">' if uses_surface(item) else "<body>"
-    # 透明条目不声明 color-scheme，也不输出 surface 样式：浏览器不会为画布补黑白底色。
-    surface_style = (
-        ":root { color-scheme: light dark; }\n"
-        "body.surface { background: #f6f8fc; }\n"
-        "@media (prefers-color-scheme: dark) { body.surface { background: #0c1020; } }\n"
-        if uses_surface(item)
-        else ""
-    )
     return (
         "<!doctype html>\n"
         '<html lang="zh-CN">\n'
@@ -221,14 +207,13 @@ def render_embed(item: IframeItem, query: str = "") -> str:
         '<meta name="robots" content="noindex">\n'
         f"<title>{title}</title>\n"
         "<style>\n"
-        f"{surface_style}"
         "html, body { height: 100%; margin: 0; background: transparent; }\n"
         "body { display: grid; place-items: center; }\n"
         "img, iframe { display: block; width: 100%; height: 100%; border: 0; "
         "object-fit: contain; background: transparent; }\n"
         "</style>\n"
         "</head>\n"
-        f"{body_tag}\n"
+        "<body>\n"
         f"{media}\n"
         f"{relay}"
         "</body>\n"
