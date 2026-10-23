@@ -274,7 +274,7 @@ export const apiDocs: ApiToolDoc[] = [
         fields: [{ name: 'q', label: '关键词', type: 'string', description: '可选，最多 100 字符。' }],
         exampleBody: { q: '奶蛙' },
         exampleResponse: { iframes: [milkFrogExample] },
-        note: '目录与嵌入页无需认证；embed_url 由当前 API 地址与 embed_path 拼接，可直接作为 iframe 的 src。preview_url 是列表与详情页大卡片共用的预览图，图片条目复用 content_url。',
+        note: '目录与嵌入页无需认证；embed_url 由当前 API 地址与 embed_path 拼接，可直接作为 iframe 的 src。preview_url 是列表与详情页大卡片共用的预览图，图片条目与 content_url 同源，部分条目会附加缩略图参数以降低加载流量。',
       },
       {
         id: 'detail',

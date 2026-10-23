@@ -12,13 +12,17 @@ PENGUIN_WIDGET_URL = "https://superbox.fiacloud.top/widgets/penguin"
 PENGUIN_PREVIEW = (
     "https://superboxfiles.fiacloud.top/Iframe/%E5%87%91%E4%BC%81%E9%B9%85.png"
 )
+TAFFY_IMAGE = (
+    "https://superboxfiles.fiacloud.top/Iframe/taffy%E6%8E%A2%E5%A4%B4.png"
+)
+TAFFY_PREVIEW = f"{TAFFY_IMAGE}?imageMogr2/thumbnail/640x"
 
 
 def test_iframe_catalog_search_and_detail():
     catalog = client.get(f"{API}/iframes")
     assert catalog.status_code == 200
     items = catalog.json()["iframes"]
-    assert [item["slug"] for item in items] == ["milk-frog", "penguin"]
+    assert [item["slug"] for item in items] == ["milk-frog", "taffy", "penguin"]
 
     item = items[0]
     assert item == {
@@ -67,6 +71,42 @@ def test_iframe_embed_page_is_embeddable_html():
     missing = client.get(f"{API}/iframes/missing/embed")
     assert missing.status_code == 404
     assert missing.json()["code"] == "NOT_FOUND"
+
+
+def test_taffy_iframe_reuses_image_with_thumbnail_preview():
+    taffy = client.get(f"{API}/iframes/taffy").json()
+    assert taffy == {
+        "slug": "taffy",
+        "name": "Taffy探头",
+        "category": "图片展示",
+        "description": "Taffy探头图片展示，可直接嵌入任意网页。",
+        "keywords": ["taffy", "探头", "图片", "iframe"],
+        "content_type": "image",
+        "content_url": TAFFY_IMAGE,
+        "preview_url": TAFFY_PREVIEW,
+        "thumbnail_url": TAFFY_PREVIEW,
+        "embed_path": "/api/v1/iframes/taffy/embed",
+        "embed_url": "http://testserver/api/v1/iframes/taffy/embed",
+        "width": 415,
+        "height": 595,
+        "sandbox": "",
+        "allow": "",
+    }
+    # 预览图与实际图片同源，仅追加 COS 缩略图参数。
+    assert taffy["preview_url"].startswith(taffy["content_url"])
+    assert taffy["thumbnail_url"] == taffy["preview_url"]
+
+    for query in ("taffy", "探头"):
+        found = client.get(f"{API}/iframes?q={query}").json()["iframes"]
+        assert [entry["slug"] for entry in found] == ["taffy"]
+
+    response = client.get(f"{API}/iframes/taffy/embed")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "<title>Taffy探头</title>" in response.text
+    # 嵌入页仍展示原始大图，缩略图参数只用于目录预览。
+    assert f'<img src="{TAFFY_IMAGE}" alt="Taffy探头">' in response.text
+    assert "postMessage" not in response.text
 
 
 def test_penguin_iframe_embeds_widget_page():

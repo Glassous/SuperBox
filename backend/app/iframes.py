@@ -15,6 +15,10 @@ EMBED_CACHE_CONTROL = "public, max-age=300"
 
 MILK_FROG_IMAGE = "https://officialimages.glassous.top/other/%E5%A5%B6%E8%9B%99.png"
 
+TAFFY_IMAGE = "https://superboxfiles.fiacloud.top/Iframe/taffy%E6%8E%A2%E5%A4%B4.png"
+# 预览图与实际图片同源，仅追加 COS 缩略图参数降低列表页流量。
+TAFFY_PREVIEW = f"{TAFFY_IMAGE}?imageMogr2/thumbnail/640x"
+
 # 网页类型条目只能声明绝对地址，挂件页面由前端静态站点托管。
 PENGUIN_WIDGET_URL = "https://superbox.fiacloud.top/widgets/penguin"
 PENGUIN_PREVIEW = (
@@ -76,6 +80,22 @@ IFRAMES: list[IframeItem] = [
         "preview_url": MILK_FROG_IMAGE,
         "width": 640,
         "height": 640,
+        "sandbox": "",
+        "allow": "",
+    },
+    {
+        "slug": "taffy",
+        "name": "Taffy探头",
+        "category": "图片展示",
+        "description": "Taffy探头图片展示，可直接嵌入任意网页。",
+        "keywords": ["taffy", "探头", "图片", "iframe"],
+        "content_type": "image",
+        "content_url": TAFFY_IMAGE,
+        # 与奶蛙同为纯图片条目；原图较大（1328×1904），预览走同源缩略图。
+        "preview_url": TAFFY_PREVIEW,
+        # 推荐尺寸保持原图 83:119 的宽高比。
+        "width": 415,
+        "height": 595,
         "sandbox": "",
         "allow": "",
     },
