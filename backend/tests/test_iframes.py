@@ -107,6 +107,12 @@ def test_taffy_iframe_reuses_image_with_thumbnail_preview():
     # 嵌入页仍展示原始大图，缩略图参数只用于目录预览。
     assert f'<img src="{TAFFY_IMAGE}" alt="Taffy探头">' in response.text
     assert "postMessage" not in response.text
+    # 原图是透明 PNG，嵌入页不铺任何底色，也不声明 color-scheme 以免画布补黑白底。
+    assert "<body>" in response.text
+    assert 'class="surface"' not in response.text
+    assert "background: transparent" in response.text
+    assert "color-scheme" not in response.text
+    assert "prefers-color-scheme" not in response.text
 
 
 def test_penguin_iframe_embeds_widget_page():

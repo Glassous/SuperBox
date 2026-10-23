@@ -7,6 +7,7 @@ Iframe 仓库提供可直接嵌入任意网页的挂件。后端维护条目目�
 | slug | 名称 | 分类 | 内容类型 | 推荐尺寸 |
 | --- | --- | --- | --- | --- |
 | `milk-frog` | 奶蛙 | 图片展示 | `image` | 640 × 640 |
+| `taffy` | Taffy探头 | 图片展示 | `image` | 415 × 595 |
 | `penguin` | 凑企鹅 | 3D 互动 | `page` | 800 × 800 |
 
 ## 目录与搜索
@@ -73,11 +74,11 @@ curl http://localhost:8087/api/v1/iframes/milk-frog
 
 `GET /api/v1/iframes/{slug}/embed`，返回可直接作为 `iframe src` 的完整 HTML（`text/html; charset=utf-8`）。
 
-- `image` 类型渲染全屏 `<img>`，使用 `object-fit: contain` 居中显示；浅色背景为 `#f6f8fc`，`prefers-color-scheme: dark` 时为 `#0c1020`。
+- `image` 类型渲染全屏 `<img>`，使用 `object-fit: contain` 居中显示；条目 `background` 为 `surface` 时铺留白底色（浅色 `#f6f8fc`，`prefers-color-scheme: dark` 时为 `#0c1020`），为 `transparent` 时页面不绘制任何底色。
 - `page` 类型渲染嵌套 `<iframe>`，按条目的 `sandbox` 与 `allow` 输出，并附加一段脚本把父页面与挂件页之间的 `postMessage` 互相转发；嵌入页的查询串会原样透传给挂件页（如 `?action=2&chrome=0`）。
 - 响应头包含 `Cache-Control: public, max-age=300` 与按内容类型生成的 CSP；不设置 `X-Frame-Options`，允许被任意站点嵌入。
 - 图片页 CSP 为 `default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`；网页页把 `img-src` 换成 `frame-src https: http:`，并增加 `script-src 'unsafe-inline'` 供消息转发脚本使用。
-- 网页条目的嵌入页不绘制底色（`body` 透明、内层 iframe 也透明），宿主页面看到的就是模型本身；图片条目仍保留浅色/深色 `surface` 底色作为留白。
+- 网页条目的嵌入页不绘制底色（`body` 透明、内层 iframe 也透明），宿主页面看到的就是模型本身；图片条目按 `background` 决定底色，奶蛙保留浅色/深色 `surface` 留白，Taffy探头为透明 PNG，嵌入页与图片都完全透明，不植入黑白色背景。透明条目不会输出 `color-scheme`，避免浏览器按系统深浅色给画布补一层底色。
 - 未知 slug 返回统一的 JSON 404，而不是 HTML。
 
 ```bash
@@ -130,7 +131,7 @@ curl -i http://localhost:8087/api/v1/iframes/milk-frog/embed
 
 ## 新增 Iframe 条目
 
-1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`preview_url`、`width`、`height`、`sandbox`、`allow`。`preview_url` 可留空：`image` 条目自动复用 `content_url`，`page` 条目留空则列表显示占位图。`page` 条目的 `content_url` 必须是绝对地址，并先完成前端页面部署。
+1. 在 `backend/app/iframes.py` 的 `IFRAMES` 列表加入条目：`slug`、`name`、`category`、`description`、`keywords`、`content_type`、`content_url`、`preview_url`、`background`、`width`、`height`、`sandbox`、`allow`。`background` 取 `surface`（图片铺浅色/深色留白底色）或 `transparent`（页面完全透明）；透明素材必须选 `transparent`。`preview_url` 可留空：`image` 条目自动复用 `content_url`，`page` 条目留空则列表显示占位图。`page` 条目的 `content_url` 必须是绝对地址，并先完成前端页面部署。
 2. 在 `backend/tests/test_iframes.py` 补充目录、搜索、详情与嵌入页断言；如条目数变化，同步 `backend/tests/test_api.py` 中的 Skill 接口总数。
 3. 需要条目级文档时在本目录新增说明；网页 `/iframes` 会自动展示目录与弹窗预览，无需为单个条目改动前端代码，构建脚本也不再生成条目级静态路由。
 4. 图片地址直接引用外部图床；若图床限制防盗链，需要改为服务端代理或转存 COS。

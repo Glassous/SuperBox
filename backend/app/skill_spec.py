@@ -53,7 +53,7 @@ CONVENTIONS = [
     "图片 EXIF 工具使用 `multipart/form-data`，图片来源为 `image` 文件或 `image_url` 图片链接"
     "（二选一），编辑接口返回 JSON，通过 url 下载原格式图片，文件保留 2 小时。",
     "文件输出包含 url、filename、content_type、size（字节）、expires_at（UTC ISO 8601）；到期后服务端删除，正常运行时约有一分钟清理延迟，停机或删除失败后恢复补清理。",
-    "Iframe 目录与嵌入页无需认证；`GET /api/v1/iframes/{slug}/embed` 返回 `text/html`，可直接作为 iframe 的 `src`，缓存 5 分钟，图片自适应容器并跟随系统深浅色。",
+    "Iframe 目录与嵌入页无需认证；`GET /api/v1/iframes/{slug}/embed` 返回 `text/html`，可直接作为 iframe 的 `src`，缓存 5 分钟，图片自适应容器；图片底色按条目配置，奶蛙带浅色/深色留白底色，Taffy探头完全透明、不植入黑白色背景。",
     "时间戳值通过字符串传输，避免不同客户端对大整数或小数的精度差异。",
     "当前接口无需认证；CORS 允许所有来源，但不支持携带浏览器凭据的跨域请求。",
 ]
@@ -165,7 +165,7 @@ PUBLIC_ENDPOINTS: list[Endpoint] = [
         "name": "Iframe 嵌入页",
         "summary": (
             "返回可直接作为 iframe src 的 HTML 页面；"
-            "图片自适应容器并跟随系统深浅色。"
+            "图片自适应容器，底色按条目配置（奶蛙为留白底色，Taffy探头完全透明）。"
         ),
         "request": "路径参数 `slug`；响应类型 text/html，缓存 5 分钟。",
         "request_format": "path",
